@@ -1,6 +1,6 @@
 const API_BASE_URL = "https://the-golden-candle.up.railway.app";
 
-const REFRESH_INTERVAL_MS = 60 * 1000;
+const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // every 30min
 
 // To add a new model: add an entry to MODEL_CONFIGS.
 // predKey, probsKey, versionKey must match the keys returned by /predict.
