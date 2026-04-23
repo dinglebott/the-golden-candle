@@ -4,5 +4,6 @@ pandas==3.0.2
 pydantic==2.13.3
 python-dotenv==1.2.2
 Requests==2.33.1
+scikit-learn==1.8.0
 uvicorn==0.34.3
 xgboost==3.2.0
