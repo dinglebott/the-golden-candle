@@ -205,7 +205,7 @@ header h1 {
 
 .prediction-badge {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     border: 2px solid var(--text-muted);
