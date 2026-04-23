@@ -22,6 +22,8 @@ The model architectures used are explained below:
 `train_model.py` - Trains and tests a new model\
 `models/` - Trained models, named by version number as set in configs\
 `use_model.py` - Run live inference with a trained model\
+<br/>
+
 **PatchTST:**
 - `classes.py` - Classes for datasets and transformer blocks (encoder, heads)
 - `data_utils.py` - Finds other forex pairs for pre-training, prepares datasets (features, splitting, normalisation)

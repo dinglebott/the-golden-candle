@@ -187,7 +187,11 @@ def _computeCorrFeatures(dfMain, dfCorr, prefix):
 
 # extract only time + close from raw data
 def _jsonToCloses(jsonData):
-    raw = jsonData if isinstance(jsonData, dict) else json.load(open(jsonData))
+    if isinstance(jsonData, dict):
+        raw = jsonData
+    else:
+        with open(jsonData, "r") as f:
+            raw = json.load(f)
     records = [
         {"time": c["time"], "close": float(c["mid"]["c"])}
         for c in raw["candles"] if c["complete"]
