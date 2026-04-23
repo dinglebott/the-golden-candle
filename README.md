@@ -22,7 +22,8 @@ This is a collection of training and testing pipelines for various model archite
 `dist/` - Server-side Docker container
 - `api/` - Pulls live data, runs inference, returns response
 - `artifacts/` - Models and model configs, sorted by binary type
-`web_interface/` - Standard website front-end\
+
+`web_interface/` - Standard website front-end
 - `config.js` - API URL, model registry
 - `api.js` - Requests from back-end
 - `ui.js` - Draws to DOM
