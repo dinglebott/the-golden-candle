@@ -10,7 +10,8 @@ from api.models import PredictionResponse, CandleInfo
 from api.data_processing import getData, parseData, parseLiveCorrelated
 
 logger = logging.getLogger(__name__)
-ARTIFACTS = Path("artifacts")
+GATE_ARTIFACTS = Path("artifacts/gate")
+DIR_ARTIFACTS = Path("artifacts/dir")
 K_VALUE = 1.5
 
 xgbGateVersion = 1
@@ -39,7 +40,7 @@ app.add_middleware(
 )
 
 # guard against silent failure
-assert (ARTIFACTS / f"xgbGateFeatures_v{xgbGateVersion}.json").exists(), \
+assert (GATE_ARTIFACTS / f"xgbFeatures_v{xgbGateVersion}.json").exists(), \
     f"XGB feature list not found for version {xgbGateVersion}"
 
 @app.get("/health")
@@ -48,7 +49,7 @@ def health():
 
 @app.get("/predict", response_model=PredictionResponse)
 def getPrediction():
-    with open(ARTIFACTS / f"xgbGateFeatures_v{xgbGateVersion}.json", "r") as file:
+    with open(GATE_ARTIFACTS / f"xgbFeatures_v{xgbGateVersion}.json", "r") as file:
         xgbGateFeatureList = json.load(file)["features"]
 
     try:
