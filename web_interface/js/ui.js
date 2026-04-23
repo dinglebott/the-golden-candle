@@ -51,7 +51,7 @@ function updateCandle(data) {
 
     // compute start and end hours
     candleStart = new Date(data.timestamp)
-    candleEnd = candleStart
+    candleEnd = new Date(candleStart)
     candleEnd.setHours(candleStart.getHours() + 1)
     // format
     startString = candleStart.toLocaleString("en-SG", {
@@ -70,7 +70,7 @@ function updateCandle(data) {
         })
     }
     // write to DOM
-    document.getElementById("candle-timestamp").textContent = `${startString} - ${endString}-SGT`;
+    document.getElementById("candle-timestamp").textContent = `${startString} - ${endString} SGT`;
 }
 
 function updateModels(data) {
@@ -109,9 +109,9 @@ function setStatus(state) {
 }
 
 function setLastUpdated(timestamp) {
-    currentTime = Date.now().toLocaleString("en-SG", {
+    currentTime = new Date(Date.now()).toLocaleString("en-SG", {
         day: "2-digit", month: "short",
         hour: "2-digit", minute: "2-digit", hour12: false
     })
-    document.getElementById("last-updated").textContent = `Last updated: ${currentTime}-SGT`;
+    document.getElementById("last-updated").textContent = `Last updated: ${currentTime} SGT`;
 }
