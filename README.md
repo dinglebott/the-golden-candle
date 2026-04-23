@@ -1,7 +1,11 @@
 ## ABOUT PROJECT
 **Goal -** Use machine learning to predict price movements in the forex market\
-**Models -** XGBoost, CNN-LSTM hybrid, Temporal Fusion Transformer\
-This is a collection of training and testing pipelines for various model architectures (listed above). The problem is framed as two binary classifications. Firstly, will the price move significantly over the forecasting horizon? Secondly, given that it moves, does it move up or down?
+**Models -** XGBoost, CNN-LSTM hybrid, PatchTST\
+This is a collection of training and testing pipelines for various model architectures (listed above). The problem is framed as two binary classifications. Firstly, will the price move significantly over the forecasting horizon? Secondly, given that it moves, does it move up or down?\
+The model architectures used are explained below:
+- **XGBoost** uses a gradient-boosted decision tree framework. It builds decision trees sequentially, with each tree improving on the previous one via a gradient descent algorithm. As a traditional machine learning algorithm, it is faster than its modern deep learning counterparts, and performs well on structured, tabular data.
+- **CNN-LSTM** is a hybrid of Convolutional Neural Networks and Long Short-Term Memory networks, which are a variant of Recurrent Neural Networks. The CNN extracts local patterns and reduce noise. The output of the CNN is passed to the LSTM layers, which capture temporal patterns and long-term relationships. This makes them good for time series data like forex markets.
+- **PatchTST** (Patch Time Series Transformer) breaks time series into smaller patches, which serve as input tokens. The transformer backbone uses a combination of encoder and decoder blocks to understand the data and generate predicted data. The encoder prominently uses self-attention heads, which allow it to understand cross-token context. Finally, the output goes through an output head which produces forecasted values, or classification probabilities in this project.
 <br/>
 
 ## PROJECT STRUCTURE
