@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://your-api-url.com";
+const API_BASE_URL = "https://the-golden-candle.up.railway.app";
 
 const REFRESH_INTERVAL_MS = 60 * 1000;
 
