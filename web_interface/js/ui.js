@@ -60,17 +60,17 @@ function updateCandle(data) {
     })
     // exclude date from endString if same day
     if (candleEnd.getDate() == candleStart.getDate()) {
-        endString = candleEnd.toLocaleString("en_SG", {
+        endString = candleEnd.toLocaleString("en-SG", {
             hour: "2-digit", minute: "2-digit", hour12: false
         })
     } else {
-        endString = candleEnd.toLocaleString("en_SG", {
+        endString = candleEnd.toLocaleString("en-SG", {
             day: "2-digit", month: "short",
             hour: "2-digit", minute: "2-digit", hour12: false
         })
     }
     // write to DOM
-    document.getElementById("candle-timestamp").textContent = `${startString} - ${endString} SGT`;
+    document.getElementById("candle-timestamp").textContent = `${startString} - ${endString}-SGT`;
 }
 
 function updateModels(data) {
@@ -113,5 +113,5 @@ function setLastUpdated(timestamp) {
         day: "2-digit", month: "short",
         hour: "2-digit", minute: "2-digit", hour12: false
     })
-    document.getElementById("last-updated").textContent = `Last updated: ${currentTime} SGT`;
+    document.getElementById("last-updated").textContent = `Last updated: ${currentTime}-SGT`;
 }
