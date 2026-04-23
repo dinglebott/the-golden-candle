@@ -19,7 +19,7 @@ version = env["xgb"]["use_version"]
 
 # DEFINE FEATURES (copy-paste from the model training features exactly)
 modelMode = "gate" if binary == 0 else "dir"
-with open(Path(f"model_configs/{modelMode}_features_v{version}.json"), "r") as file:
+with open(Path(f"model_configs/v{version}/{modelMode}_features.json"), "r") as file:
     features = json.load(file)["features"]
 
 # LOAD MODEL

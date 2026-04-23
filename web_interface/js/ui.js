@@ -2,11 +2,11 @@ function formatPrice(val) {
     return val.toFixed(5);
 }
 
-function formatTimestamp(ts) {
-    return new Date(ts).toLocaleString("en-GB", {
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit", timeZone: "UTC"
-    }) + " UTC";
+function formatTimestamp(dateObj) {
+    return dateObj.toLocaleString("en-SG", {
+        day: "2-digit", month: "short",
+        hour: "2-digit", minute: "2-digit", hour12: false
+    });
 }
 
 // Called once on load — builds a card DOM node for each model in MODEL_CONFIGS
@@ -48,7 +48,29 @@ function updateCandle(data) {
     document.getElementById("candle-low").textContent     = formatPrice(data.low);
     document.getElementById("candle-close").textContent   = formatPrice(data.close);
     document.getElementById("candle-barrier").textContent = formatPrice(data.barrier);
-    document.getElementById("candle-timestamp").textContent = formatTimestamp(data.timestamp);
+
+    // compute start and end hours
+    candleStart = new Date(data.timestamp)
+    candleEnd = candleStart
+    candleEnd.setHours(candleStart.getHours() + 1)
+    // format
+    startString = candleStart.toLocaleString("en-SG", {
+        day: "2-digit", month: "short",
+        hour: "2-digit", minute: "2-digit", hour12: false
+    })
+    // exclude date from endString if same day
+    if (candleEnd.getDate() == candleStart.getDate()) {
+        endString = candleEnd.toLocaleString("en_SG", {
+            hour: "2-digit", minute: "2-digit", hour12: false
+        })
+    } else {
+        endString = candleEnd.toLocaleString("en_SG", {
+            day: "2-digit", month: "short",
+            hour: "2-digit", minute: "2-digit", hour12: false
+        })
+    }
+    // write to DOM
+    document.getElementById("candle-timestamp").textContent = `${startString} - ${endString} SGT`;
 }
 
 function updateModels(data) {
@@ -87,5 +109,9 @@ function setStatus(state) {
 }
 
 function setLastUpdated(timestamp) {
-    document.getElementById("last-updated").textContent = `Last updated: ${formatTimestamp(timestamp)}`;
+    currentTime = Date.now().toLocaleString("en-SG", {
+        day: "2-digit", month: "short",
+        hour: "2-digit", minute: "2-digit", hour12: false
+    })
+    document.getElementById("last-updated").textContent = `Last updated: ${currentTime} SGT`;
 }
