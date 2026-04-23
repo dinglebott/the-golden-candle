@@ -11,7 +11,7 @@ import time
 
 # get oanda api key (from .env file)
 load_dotenv()
-apiKey = os.getenv("API_KEY")
+apiKey = os.getenv("OANDA_KEY")
 
 # global variables
 headers = {"Authorization": f"Bearer {apiKey}"}
@@ -27,7 +27,7 @@ baseUrl = "https://api-fxtrade.oanda.com" # access token generated from live acc
 
 
 # FETCH DATA ONCE (saves locally as JSON file)
-def getData(instr="EUR_USD", gran="H1", count=500, subfolder=""):
+def getData(instr="EUR_USD", gran="H1", count=500):
     # get response
     params = {
         "granularity": gran,

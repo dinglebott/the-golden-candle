@@ -21,6 +21,7 @@ trainSplit = env["train_split"]
 valSplit = env["val_split"]
 device = env["device"]
 binary = env["binary"]
+corrPair = env["corr_pair"]
 
 features = [
     "open_return", "high_return", "low_return", "close_return", "vol_return",
@@ -32,15 +33,27 @@ features = [
     "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx", "di_diff",
     "fast_pct_R", "slow_pct_R",
     "close_lag1", "close_lag2", "close_lag3", "close_lag4",
-    "vol_lag1", "vol_lag2", "vol_lag3", "vol_lag4",
-    "gbp_close_return", "gbp_return_spread", "gbp_rolling_corr_20", "gbp_cross_zscore"
+    "vol_lag1", "vol_lag2", "vol_lag3", "vol_lag4"
 ]
+if isinstance(corrPair, str):
+    corrPrefix = corrPair.split("_")[0].lower()
+    features.extend([
+        f"{corrPrefix}_close_return", f"{corrPrefix}_return_spread",
+        f"{corrPrefix}_rolling_corr_20", f"{corrPrefix}_cross_zscore"
+    ])
+elif corrPair == 0:
+    pass
+else:
+    raise Exception("corr_pair must be 0 or a valid currency pair string")
 
 # LOAD AND SPLIT DATA
 _rawDataDir = Path(__file__).parent.parent.parent / "raw_data"
 df = dataparser.parseData(_rawDataDir / f"{instrument}_{granularity}_{yearNow - 21}-01-01_{yearNow}-04-01.json")
-df_corr = dataparser.parseCorrelated(instrument, "GBP_USD")
-df = df.merge(df_corr, on="time", how="inner") # merge by union
+# conditional correlated pair loading
+if isinstance(corrPair, str):
+    df_corr = dataparser.parseCorrelated(instrument, corrPair)
+    df = df.merge(df_corr, on="time", how="inner") # merge by union
+# add target
 if binary == 0:
     df = dataparser.addGateTarget(df, k, n)
 elif binary == 1:
@@ -70,7 +83,6 @@ model = xgb.XGBClassifier(
     reg_lambda=30.0,
     device=device,
     tree_method="hist",
-    eval_metric="mlogloss",
     n_estimators=1000,
     early_stopping_rounds=50,
     random_state=42
@@ -91,4 +103,5 @@ shaps.sort_values(ascending=False, inplace=True)
 print(f"\n{shaps}")
 
 Path("results").mkdir(exist_ok=True)
-shaps.to_json(Path("results/feature_rankings.json"), indent=4)
+modelMode = "gate" if binary == 0 else "dir"
+shaps.to_json(Path(f"results/{modelMode}_feature_rankings.json"), indent=4)

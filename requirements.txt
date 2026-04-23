@@ -1,0 +1,12 @@
+fastapi==0.136.0
+numpy==2.4.4
+optuna==4.8.0
+pandas==3.0.2
+pydantic==2.13.3
+python-dotenv==1.2.2
+Requests==2.33.1
+scikit_learn==1.8.0
+shap==0.51.0
+torch==2.10.0+cu128
+torch==2.11.0+cu128
+xgboost==3.2.0

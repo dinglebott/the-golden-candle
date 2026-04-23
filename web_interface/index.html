@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golden Candle</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Golden Candle</h1>
+            <div id="status-bar">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text"></span>
+                <span id="last-updated">--</span>
+                <button id="refresh-btn">Refresh</button>
+            </div>
+        </header>
+
+        <section id="candle-section">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">EUR / USD &nbsp;H1</span>
+                    <span id="candle-timestamp">--</span>
+                </div>
+                <div class="ohlc-grid">
+                    <div class="ohlc-item">
+                        <span class="ohlc-label">Open</span>
+                        <span id="candle-open" class="ohlc-value">--</span>
+                    </div>
+                    <div class="ohlc-item">
+                        <span class="ohlc-label">High</span>
+                        <span id="candle-high" class="ohlc-value high">--</span>
+                    </div>
+                    <div class="ohlc-item">
+                        <span class="ohlc-label">Low</span>
+                        <span id="candle-low" class="ohlc-value low">--</span>
+                    </div>
+                    <div class="ohlc-item">
+                        <span class="ohlc-label">Close</span>
+                        <span id="candle-close" class="ohlc-value">--</span>
+                    </div>
+                    <div class="ohlc-item">
+                        <span class="ohlc-label">Barrier</span>
+                        <span id="candle-barrier" class="ohlc-value barrier">--</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="models-section">
+            <div id="model-cards"></div>
+        </section>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

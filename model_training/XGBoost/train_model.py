@@ -1,6 +1,6 @@
 import sys
 import xgboost as xgb
-from sklearn.metrics import f1_score, log_loss, roc_auc_score, confusion_matrix, classification_report
+from sklearn.metrics import balanced_accuracy_score, matthews_corrcoef, log_loss, roc_auc_score, confusion_matrix
 import pandas as pd
 import json
 from pathlib import Path
@@ -20,15 +20,21 @@ n = env["n_value"]
 trainSplit = env["train_split"]
 valSplit = env["val_split"]
 binary = env["binary"]
+corrPair = env["corr_pair"]
+log_metrics = env["log_metrics"]
 
-version = 1
-log_metrics = True
+version = env["xgb"]["train_version"]
 
 # LOAD AND SPLIT DATAFRAMES
 _rawDataDir = Path(__file__).parent.parent.parent / "raw_data"
 df = dataparser.parseData(_rawDataDir / f"{instrument}_{granularity}_{yearNow - 21}-01-01_{yearNow}-04-01.json")
-df_corr = dataparser.parseCorrelated(instrument, "GBP_USD")
-df = df.merge(df_corr, on="time", how="inner") # merge by union
+# conditional correlated pair loading
+if isinstance(corrPair, str):
+    df_corr = dataparser.parseCorrelated(instrument, corrPair)
+    df = df.merge(df_corr, on="time", how="inner") # merge by union
+elif corrPair != 0:
+    raise Exception("corr_pair must be 0 or a valid currency pair string")
+# add target
 if binary == 0:
     df = dataparser.addGateTarget(df, k, n)
 elif binary == 1:
@@ -43,12 +49,13 @@ dfVal = df[trainEndIdx:valEndIdx]
 dfTest = df[valEndIdx:]
 
 # DEFINE FEATURES
-with open(Path(f"model_configs/features_v{version}.json"), "r") as file:
+modelMode = "gate" if binary == 0 else "dir"
+with open(Path(f"model_configs/v{version}/{modelMode}_features.json"), "r") as file:
     bestFeatures = json.load(file)["features"]
 print(f"Best {len(bestFeatures)} features:", bestFeatures)
 
 # DEFINE HYPERPARAMETERS (use results from Phase 3)
-with open(Path(f"model_configs/params_v{version}.json"), "r") as file:
+with open(Path(f"model_configs/v{version}/{modelMode}_params.json"), "r") as file:
     bestParams = json.load(file)
 # cast floats to ints where necessary
 bestParams["max_depth"] = int(bestParams["max_depth"])
@@ -65,11 +72,11 @@ y_test = dfTest["target"]
 
 # BUILD MODEL
 model = xgb.XGBClassifier(
-    **bestParams, eval_metric="mlogloss",
+    **bestParams,
     n_estimators=1000, # high ceiling
     early_stopping_rounds=50, # stop after metric plateaus for 50 rounds
     random_state=42,
-    device=env["device"],
+    device="cpu",
     tree_method="hist"
 )
 
@@ -83,14 +90,15 @@ model.fit(
 y_pred = model.predict(X_test)
 y_predTrain = model.predict(X_train) # for overfitting evaluation
 # returns 1D array of shape (n_samples)
-# values 0 | 1 | 2
+# values 0 | 1
 y_prob = model.predict_proba(X_test)
 # returns 2D array of shape (n_samples, n_classes)
-# chance of 0 | 1 | 2 for each datapoint
+# chance of 0 | 1 for each datapoint
 
 # EVALUATE MODEL
-f1Score = f1_score(y_test, y_pred, average="macro", zero_division=0)
-trainF1Score = f1_score(y_train, y_predTrain, average="macro", zero_division=0) # compare with f1Score to check overfitting
+accuracy = balanced_accuracy_score(y_test, y_pred) * 100
+mcc = matthews_corrcoef(y_test, y_pred)
+trainMcc = matthews_corrcoef(y_train, y_predTrain)
 logLossScore = log_loss(y_test, y_prob)
 rocAucScore = roc_auc_score(y_test, y_prob[:, 1])
 cmatrix = confusion_matrix(y_test, y_pred)
@@ -100,15 +108,14 @@ cmatrixDf.loc["Count"] = cmatrixDf.sum(axis=0)
 
 # RECORD RESULTS
 lines = []
-modelMode = "gate" if binary == 0 else "dir"
 lines.append(f"=== v{version} | {instrument} {granularity} | {modelMode} | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
-lines.append(f"F1 score (macro-averaged): {f1Score:.5f}")
-lines.append(f"F1 score (train set): {trainF1Score:.5f}")
-lines.append(f"Log loss score: {logLossScore:.5f}")
-lines.append(f"ROC-AUC score: {rocAucScore:.5f}")
+lines.append(f"Accuracy (balanced): {accuracy:.2f}%")
+lines.append(f"MCC: {mcc:.4f}")
+lines.append(f"MCC (train set): {trainMcc:.4f}")
+lines.append(f"Log loss score: {logLossScore:.4f}")
+lines.append(f"ROC-AUC score: {rocAucScore:.4f}")
 lines.append(f"\nConfusion matrix:\n{cmatrixDf}")
-lines.append(f"\nClassification report:")
-lines.append(classification_report(y_test, y_pred, target_names=["FLAT", "DIRECTIONAL"] if binary == 0 else ["DOWN", "UP"], zero_division=0))
+# average probability distribution per class per true class
 for true_class, name in enumerate(["flat", "directional"] if binary == 0 else ["down", "up"]):
     mask = y_test == true_class
     avg_probs = y_prob[mask].mean(axis=0)
@@ -124,5 +131,4 @@ if log_metrics:
         logFile.write(output + "\n")
 
 Path(f"models/{instrument}").mkdir(parents=True, exist_ok=True)
-modelMode = "gate" if binary == 0 else "dir"
 model.save_model(Path(f"models/{instrument}/{modelMode}_XGBoost_{instrument}_{granularity}_{yearNow}_v{version}.json"))

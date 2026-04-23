@@ -1,0 +1,15 @@
+=== v1 | EUR_USD H1 | gate | 2026-04-23 10:37:16 ===
+Accuracy (balanced): 68.43%
+MCC: 0.3854
+MCC (train set): 0.4671
+Log loss score: 0.5816
+ROC-AUC score: 0.7554
+
+Confusion matrix:
+        Pred 0  Pred 1  Count
+Real 0    3105    2550   5655
+Real 1    1403    6373   7776
+Count     4508    8923  13431
+True=flat: avg P(flat)=0.520 P(directional)=0.480
+True=directional: avg P(flat)=0.311 P(directional)=0.689
+

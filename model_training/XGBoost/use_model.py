@@ -13,12 +13,13 @@ yearNow = env["year_now"]
 instrument = env["instrument"]
 granularity = env["granularity"]
 binary = env["binary"]
+corrPair = env["corr_pair"]
 
-version = 1
+version = env["xgb"]["use_version"]
 
 # DEFINE FEATURES (copy-paste from the model training features exactly)
-# deserialise json data
-with open(Path(f"model_configs/features_v{version}.json"), "r") as file:
+modelMode = "gate" if binary == 0 else "dir"
+with open(Path(f"model_configs/{modelMode}_features_v{version}.json"), "r") as file:
     features = json.load(file)["features"]
 
 # LOAD MODEL
@@ -36,12 +37,15 @@ except (xgb.core.XGBoostError, FileNotFoundError) as e:
     raise RuntimeError(f"Error loading model: {e}")
 
 # FETCH AND PARSE CURRENT DATA
-corrPair = "GBP_USD"
 jsonData = datafetcher.getData(instrument, granularity, 200)
-jsonCorr = datafetcher.getData(corrPair, granularity, 200)
 df = dataparser.parseData(jsonData)
-df_corr = dataparser.parseLiveCorrelated(jsonData, jsonCorr, corrPair)
-df = df.merge(df_corr, on="time", how="inner")
+# conditional correlated pair loading
+if isinstance(corrPair, str):
+    jsonCorr = datafetcher.getData(corrPair, granularity, 200)
+    df_corr = dataparser.parseLiveCorrelated(jsonData, jsonCorr, corrPair)
+    df = df.merge(df_corr, on="time", how="inner")
+elif corrPair != 0:
+    raise Exception("corr_pair must be 0 or a valid currency pair string")
 
 # GET PREDICTION
 latestCandle = df[features].iloc[[-1]] # slice out last row (last candle)
