@@ -10,9 +10,7 @@ from torch.utils.data import Dataset
 class SplitData:
     core_features: np.ndarray
     corr_features: np.ndarray | None
-    gate_targets: np.ndarray
-    direction_targets: np.ndarray
-    direction_mask: np.ndarray
+    targets: np.ndarray
     target_indices: np.ndarray
 
 
@@ -20,9 +18,7 @@ class WindowedTimeSeriesDataset(Dataset):
     def __init__(self, split_data, lookback, core_mean, core_std, corr_mean=None, corr_std=None):
         self.core_features = split_data.core_features
         self.corr_features = split_data.corr_features
-        self.gate_targets = split_data.gate_targets
-        self.direction_targets = split_data.direction_targets
-        self.direction_mask = split_data.direction_mask
+        self.targets = split_data.targets
         self.target_indices = split_data.target_indices
         self.lookback = lookback
         self.core_mean = core_mean
@@ -48,9 +44,7 @@ class WindowedTimeSeriesDataset(Dataset):
         return {
             "core_inputs": torch.tensor(core_window, dtype=torch.float32),
             "corr_inputs": torch.tensor(corr_window, dtype=torch.float32),
-            "gate_target": torch.tensor(self.gate_targets[end_idx], dtype=torch.float32),
-            "direction_target": torch.tensor(self.direction_targets[end_idx], dtype=torch.float32),
-            "direction_mask": torch.tensor(self.direction_mask[end_idx], dtype=torch.float32),
+            "target": torch.tensor(self.targets[end_idx], dtype=torch.float32),
         }
 
 
@@ -78,7 +72,7 @@ class EncoderBlock(nn.Module):
         return x
 
 
-class MultiTaskPatchTST(nn.Module):
+class PatchTST(nn.Module):
     def __init__(self, num_core_features, corr_input_dim, config):
         super().__init__()
         self.patch_len = config["patch_len"]
@@ -112,24 +106,13 @@ class MultiTaskPatchTST(nn.Module):
             EncoderBlock(self.d_model, config["num_heads"], config["mlp_ratio"], config["dropout"])
             for _ in range(config["base_encoder_blocks"])
         ])
-        self.gate_blocks = nn.ModuleList([
-            EncoderBlock(self.d_model, config["num_heads"], config["mlp_ratio"], config["dropout"])
-            for _ in range(config["branch_encoder_blocks"])
-        ])
-        self.direction_blocks = nn.ModuleList([
+        self.task_blocks = nn.ModuleList([
             EncoderBlock(self.d_model, config["num_heads"], config["mlp_ratio"], config["dropout"])
             for _ in range(config["branch_encoder_blocks"])
         ])
 
         head_hidden = max(self.d_model // 2, 32)
-        self.gate_head = nn.Sequential(
-            nn.LayerNorm(self.d_model),
-            nn.Linear(self.d_model, head_hidden),
-            nn.GELU(),
-            nn.Dropout(config["dropout"]),
-            nn.Linear(head_hidden, 1),
-        )
-        self.direction_head = nn.Sequential(
+        self.head = nn.Sequential(
             nn.LayerNorm(self.d_model),
             nn.Linear(self.d_model, head_hidden),
             nn.GELU(),
@@ -157,12 +140,9 @@ class MultiTaskPatchTST(nn.Module):
                 self._set_requires_grad(block, True)
             self.positional_embedding.requires_grad = True
 
-        for block in self.gate_blocks:
+        for block in self.task_blocks:
             self._set_requires_grad(block, True)
-        for block in self.direction_blocks:
-            self._set_requires_grad(block, True)
-        self._set_requires_grad(self.gate_head, True)
-        self._set_requires_grad(self.direction_head, True)
+        self._set_requires_grad(self.head, True)
 
         if self.corr_projection is not None:
             self._set_requires_grad(self.corr_projection, True)
@@ -186,14 +166,8 @@ class MultiTaskPatchTST(nn.Module):
             corr_context = self.corr_projection(corr_context)
             corr_context = self.corr_adapter(corr_context)
 
-        gate_branch = x + corr_context
-        for block in self.gate_blocks:
-            gate_branch = block(gate_branch)
+        x = x + corr_context
+        for block in self.task_blocks:
+            x = block(x)
 
-        direction_branch = x + corr_context
-        for block in self.direction_blocks:
-            direction_branch = block(direction_branch)
-
-        gate_logits = self.gate_head(gate_branch.mean(dim=1)).squeeze(-1)
-        direction_logits = self.direction_head(direction_branch.mean(dim=1)).squeeze(-1)
-        return gate_logits, direction_logits
+        return self.head(x.mean(dim=1)).squeeze(-1)

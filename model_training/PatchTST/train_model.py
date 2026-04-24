@@ -12,13 +12,13 @@ from sklearn.metrics import balanced_accuracy_score, confusion_matrix, log_loss,
 from torch.utils.data import ConcatDataset, DataLoader
 from tqdm.auto import tqdm
 
-from classes import MultiTaskPatchTST, WindowedTimeSeriesDataset
+from classes import PatchTST, WindowedTimeSeriesDataset
 from data_utils import (
     CORE_FEATURES,
     compute_train_stats,
     get_corr_feature_names,
-    prepare_multitask_dataframe,
     make_split_bundle,
+    prepare_task_dataframe,
     resolve_pretrain_pairs,
     resolve_target_instrument,
 )
@@ -56,6 +56,19 @@ DEFAULT_PARAMS = {
     "finetune_unfreeze_shared_blocks": 0,
 }
 
+TASK_CONFIG = {
+    0: {
+        "mode_name": "gate",
+        "display_name": "Gate",
+        "class_names": ("flat", "directional"),
+    },
+    1: {
+        "mode_name": "dir",
+        "display_name": "Direction",
+        "class_names": ("down", "up"),
+    },
+}
+
 
 def safe_mean(values):
     return float(np.mean(values)) if len(values) > 0 else float("nan")
@@ -72,7 +85,6 @@ def load_training_params(version):
     if config_path.exists():
         with open(config_path, "r") as file:
             params.update(json.load(file))
-
     return params
 
 
@@ -82,15 +94,6 @@ def compute_pos_weight(labels):
     if positive_count == 0:
         return 1.0
     return max(negative_count / positive_count, 1.0)
-
-
-def compute_direction_pos_weight(direction_targets, direction_mask):
-    valid = direction_mask > 0.5
-    positives = float(direction_targets[valid].sum())
-    negatives = float(valid.sum() - positives)
-    if positives == 0:
-        return 1.0
-    return max(negatives / positives, 1.0)
 
 
 def compute_binary_metrics(y_true, y_prob):
@@ -104,6 +107,7 @@ def compute_binary_metrics(y_true, y_prob):
             "roc_auc": float("nan"),
             "confusion_matrix": np.zeros((2, 2), dtype=np.int64),
         }
+
     y_pred = (y_prob >= 0.5).astype(np.int64)
     metrics = {
         "balanced_accuracy": balanced_accuracy_score(y_true, y_pred) * 100,
@@ -133,6 +137,7 @@ def build_datasets(split_bundles, lookback, core_mean, core_std, corr_mean, corr
         datasets.append(
             WindowedTimeSeriesDataset(bundle[split_name], lookback, core_mean, core_std, corr_mean, corr_std)
         )
+
     if len(datasets) == 1:
         return datasets[0]
     return ConcatDataset(datasets)
@@ -167,39 +172,18 @@ def build_eval_loaders(split_bundle, config, core_mean, core_std, corr_mean, cor
 
 
 def gather_stage_targets(split_bundles, split_name):
-    gate_labels = np.concatenate([
-        bundle[split_name].gate_targets[bundle[split_name].target_indices]
+    return np.concatenate([
+        bundle[split_name].targets[bundle[split_name].target_indices]
         for bundle in split_bundles
     ])
-    direction_targets = np.concatenate([
-        bundle[split_name].direction_targets[bundle[split_name].target_indices]
-        for bundle in split_bundles
-    ])
-    direction_masks = np.concatenate([
-        bundle[split_name].direction_mask[bundle[split_name].target_indices]
-        for bundle in split_bundles
-    ])
-    return gate_labels, direction_targets, direction_masks
 
 
-def run_epoch(
-    model,
-    loader,
-    device,
-    gate_pos_weight,
-    direction_pos_weight,
-    loss_weights,
-    optimizer=None,
-    grad_clip=None,
-    desc=None,
-):
+def run_epoch(model, loader, device, pos_weight, optimizer=None, grad_clip=None, desc=None):
     is_training = optimizer is not None
     model.train(is_training)
 
-    gate_probabilities = []
-    gate_targets = []
-    direction_probabilities = []
-    direction_targets = []
+    probabilities = []
+    targets = []
     total_loss = 0.0
     total_samples = 0
 
@@ -207,24 +191,11 @@ def run_epoch(
     for batch in progress:
         core_inputs = batch["core_inputs"].to(device)
         corr_inputs = batch["corr_inputs"].to(device)
-        gate_target = batch["gate_target"].to(device)
-        direction_target = batch["direction_target"].to(device)
-        direction_mask = batch["direction_mask"].to(device) > 0.5
+        target = batch["target"].to(device)
 
         with torch.set_grad_enabled(is_training):
-            gate_logits, direction_logits = model(core_inputs, corr_inputs)
-            gate_loss = F.binary_cross_entropy_with_logits(gate_logits, gate_target, pos_weight=gate_pos_weight)
-
-            if direction_mask.any():
-                direction_loss = F.binary_cross_entropy_with_logits(
-                    direction_logits[direction_mask],
-                    direction_target[direction_mask],
-                    pos_weight=direction_pos_weight,
-                )
-            else:
-                direction_loss = torch.zeros((), device=device)
-
-            loss = loss_weights["gate"] * gate_loss + loss_weights["direction"] * direction_loss
+            logits = model(core_inputs, corr_inputs)
+            loss = F.binary_cross_entropy_with_logits(logits, target, pos_weight=pos_weight)
 
             if is_training:
                 optimizer.zero_grad(set_to_none=True)
@@ -238,28 +209,17 @@ def run_epoch(
         total_samples += batch_size
         progress.set_postfix(loss=f"{total_loss / max(total_samples, 1):.4f}")
 
-        gate_probabilities.append(torch.sigmoid(gate_logits).detach().cpu().numpy())
-        gate_targets.append(gate_target.detach().cpu().numpy())
-
-        if direction_mask.any():
-            direction_probabilities.append(torch.sigmoid(direction_logits[direction_mask]).detach().cpu().numpy())
-            direction_targets.append(direction_target[direction_mask].detach().cpu().numpy())
-
-    gate_probs = np.concatenate(gate_probabilities)
-    gate_true = np.concatenate(gate_targets).astype(np.int64)
-    direction_probs = np.concatenate(direction_probabilities) if direction_probabilities else np.array([], dtype=np.float64)
-    direction_true = np.concatenate(direction_targets).astype(np.int64) if direction_targets else np.array([], dtype=np.int64)
+        probabilities.append(torch.sigmoid(logits).detach().cpu().numpy())
+        targets.append(target.detach().cpu().numpy())
 
     return {
         "loss": total_loss / max(total_samples, 1),
-        "gate_true": gate_true,
-        "gate_prob": gate_probs,
-        "direction_true": direction_true,
-        "direction_prob": direction_probs,
+        "true": np.concatenate(targets).astype(np.int64),
+        "prob": np.concatenate(probabilities),
     }
 
 
-def train_stage(model, loaders, device, gate_pos_weight, direction_pos_weight, config, stage_name):
+def train_stage(model, loaders, device, pos_weight, config, stage_name):
     optimizer = torch.optim.AdamW(
         filter(lambda parameter: parameter.requires_grad, model.parameters()),
         lr=config[f"{stage_name}_learning_rate"],
@@ -270,16 +230,14 @@ def train_stage(model, loaders, device, gate_pos_weight, direction_pos_weight, c
     best_epoch = 0
     best_val_loss = math.inf
     patience_counter = 0
-
     total_epochs = config[f"{stage_name}_epochs"]
+
     for epoch in range(1, total_epochs + 1):
         train_results = run_epoch(
             model,
             loaders["train"],
             device,
-            gate_pos_weight,
-            direction_pos_weight,
-            {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
+            pos_weight,
             optimizer=optimizer,
             grad_clip=config["grad_clip"],
             desc=f"{stage_name.capitalize()} {epoch}/{total_epochs} train",
@@ -288,9 +246,7 @@ def train_stage(model, loaders, device, gate_pos_weight, direction_pos_weight, c
             model,
             loaders["val"],
             device,
-            gate_pos_weight,
-            direction_pos_weight,
-            {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
+            pos_weight,
             desc=f"{stage_name.capitalize()} {epoch}/{total_epochs} val",
         )
 
@@ -322,23 +278,19 @@ def train_stage(model, loaders, device, gate_pos_weight, direction_pos_weight, c
     }
 
 
-def evaluate_target_model(model, loaders, device, gate_pos_weight, direction_pos_weight, config):
+def evaluate_target_model(model, loaders, device, pos_weight):
     train_results = run_epoch(
         model,
         loaders["train"],
         device,
-        gate_pos_weight,
-        direction_pos_weight,
-        {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
+        pos_weight,
         desc="Evaluating train split",
     )
     test_results = run_epoch(
         model,
         loaders["test"],
         device,
-        gate_pos_weight,
-        direction_pos_weight,
-        {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
+        pos_weight,
         desc="Evaluating test split",
     )
     return train_results, test_results
@@ -357,10 +309,15 @@ def main():
     val_split = env["val_split"]
     purge_gap = env["n_value"]
     k_value = env["k_value"]
+    binary = env["binary"]
     log_metrics = env["log_metrics"]
     corr_pair = env["corr_pair"]
     version = patchtst_env["train_version"]
 
+    if binary not in TASK_CONFIG:
+        raise ValueError("binary must be 0 or 1")
+
+    task = TASK_CONFIG[binary]
     config = load_training_params(version)
     target_instrument = resolve_target_instrument(env)
     pretrain_pairs = resolve_pretrain_pairs(env)
@@ -374,12 +331,13 @@ def main():
 
     pretrain_bundles = []
     for instrument in tqdm(pretrain_pairs, desc="Preparing pretrain datasets", total=len(pretrain_pairs)):
-        df = prepare_multitask_dataframe(
+        df = prepare_task_dataframe(
             instrument,
             granularity,
             year_now,
             k_value,
             purge_gap,
+            binary,
             corr_pair=0,
             include_corr_features=False,
         )
@@ -400,32 +358,27 @@ def main():
         empty_corr_std,
     )
 
-    pretrain_gate_labels, pretrain_direction_targets, pretrain_direction_masks = gather_stage_targets(pretrain_bundles, "train")
-    pretrain_gate_pos_weight = torch.tensor(compute_pos_weight(pretrain_gate_labels), dtype=torch.float32, device=device)
-    pretrain_direction_pos_weight = torch.tensor(
-        compute_direction_pos_weight(pretrain_direction_targets, pretrain_direction_masks),
-        dtype=torch.float32,
-        device=device,
-    )
+    pretrain_targets = gather_stage_targets(pretrain_bundles, "train")
+    pretrain_pos_weight = torch.tensor(compute_pos_weight(pretrain_targets), dtype=torch.float32, device=device)
 
-    model = MultiTaskPatchTST(len(CORE_FEATURES), len(corr_features), config).to(device)
+    model = PatchTST(len(CORE_FEATURES), len(corr_features), config).to(device)
     pretrain_summary = train_stage(
         model,
         pretrain_loaders,
         device,
-        pretrain_gate_pos_weight,
-        pretrain_direction_pos_weight,
+        pretrain_pos_weight,
         config,
         "pretrain",
     )
 
     print("Preparing finetune dataset...")
-    target_df = prepare_multitask_dataframe(
+    target_df = prepare_task_dataframe(
         target_instrument,
         granularity,
         year_now,
         k_value,
         purge_gap,
+        binary,
         corr_pair=corr_pair,
         include_corr_features=bool(corr_features),
     )
@@ -454,20 +407,14 @@ def main():
     model.load_state_dict(pretrain_summary["best_state"])
     model.freeze_for_finetune(config["finetune_unfreeze_shared_blocks"])
 
-    finetune_gate_labels, finetune_direction_targets, finetune_direction_masks = gather_stage_targets([target_bundle], "train")
-    finetune_gate_pos_weight = torch.tensor(compute_pos_weight(finetune_gate_labels), dtype=torch.float32, device=device)
-    finetune_direction_pos_weight = torch.tensor(
-        compute_direction_pos_weight(finetune_direction_targets, finetune_direction_masks),
-        dtype=torch.float32,
-        device=device,
-    )
+    finetune_targets = gather_stage_targets([target_bundle], "train")
+    finetune_pos_weight = torch.tensor(compute_pos_weight(finetune_targets), dtype=torch.float32, device=device)
 
     finetune_summary = train_stage(
         model,
         finetune_loaders,
         device,
-        finetune_gate_pos_weight,
-        finetune_direction_pos_weight,
+        finetune_pos_weight,
         config,
         "finetune",
     )
@@ -484,18 +431,18 @@ def main():
         model,
         eval_loaders,
         device,
-        finetune_gate_pos_weight,
-        finetune_direction_pos_weight,
-        config,
+        finetune_pos_weight,
     )
 
-    train_gate_metrics = compute_binary_metrics(train_results["gate_true"], train_results["gate_prob"])
-    test_gate_metrics = compute_binary_metrics(test_results["gate_true"], test_results["gate_prob"])
-    train_direction_metrics = compute_binary_metrics(train_results["direction_true"], train_results["direction_prob"])
-    test_direction_metrics = compute_binary_metrics(test_results["direction_true"], test_results["direction_prob"])
+    train_metrics = compute_binary_metrics(train_results["true"], train_results["prob"])
+    test_metrics = compute_binary_metrics(test_results["true"], test_results["prob"])
 
+    class_names = task["class_names"]
     lines = []
-    lines.append(f"=== v{version} | {target_instrument} {granularity} | PatchTST pretrain+finetune | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
+    lines.append(
+        f"=== v{version} | {target_instrument} {granularity} | {task['mode_name']} | "
+        f"PatchTST pretrain+finetune | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ==="
+    )
     lines.append(f"Pretrain pairs: {', '.join(pretrain_pairs)}")
     lines.append(f"Finetune target: {target_instrument}")
     lines.append(f"Correlated pair adapter: {corr_pair if corr_features else 'disabled'}")
@@ -503,36 +450,30 @@ def main():
     lines.append(f"Finetune best epoch: {finetune_summary['best_epoch']}")
     lines.append(f"Core features: {len(CORE_FEATURES)} | Corr features: {len(corr_features)}")
     lines.append(f"Lookback: {config['lookback']} | Patch length: {config['patch_len']} | Patch stride: {config['patch_stride']}")
-    lines.append(f"Shared blocks: {config['base_encoder_blocks']} | Blocks per head: {config['branch_encoder_blocks']}")
+    lines.append(f"Shared blocks: {config['base_encoder_blocks']} | Task blocks: {config['branch_encoder_blocks']}")
     lines.append(f"Purged split gap: {purge_gap}")
     lines.append("")
-    lines.append("Gate head (flat vs directional)")
-    lines.append(f"Balanced accuracy: {test_gate_metrics['balanced_accuracy']:.2f}%")
-    lines.append(f"MCC: {test_gate_metrics['mcc']:.4f}")
-    lines.append(f"MCC (train set): {train_gate_metrics['mcc']:.4f}")
-    lines.append(f"Log loss: {test_gate_metrics['log_loss']:.4f}")
-    lines.append(f"ROC-AUC: {test_gate_metrics['roc_auc']:.4f}")
+    lines.append(f"{task['display_name']} task")
+    lines.append(f"Balanced accuracy: {test_metrics['balanced_accuracy']:.2f}%")
+    lines.append(f"MCC: {test_metrics['mcc']:.4f}")
+    lines.append(f"MCC (train set): {train_metrics['mcc']:.4f}")
+    lines.append(f"Log loss: {test_metrics['log_loss']:.4f}")
+    lines.append(f"ROC-AUC: {test_metrics['roc_auc']:.4f}")
     lines.append(
-        f"\nConfusion matrix:\n{format_confusion_matrix(test_gate_metrics['confusion_matrix'], ['Real 0', 'Real 1'], ['Pred 0', 'Pred 1'])}"
+        f"\nConfusion matrix:\n"
+        f"{format_confusion_matrix(test_metrics['confusion_matrix'], ['Real 0', 'Real 1'], ['Pred 0', 'Pred 1'])}"
     )
-    gate_negative = test_results["gate_prob"][test_results["gate_true"] == 0]
-    gate_positive = test_results["gate_prob"][test_results["gate_true"] == 1]
-    lines.append(f"True=flat: avg P(directional)={safe_mean(gate_negative):.3f}")
-    lines.append(f"True=directional: avg P(directional)={safe_mean(gate_positive):.3f}")
-    lines.append("")
-    lines.append("Direction head (down vs up | directional samples only)")
-    lines.append(f"Balanced accuracy: {test_direction_metrics['balanced_accuracy']:.2f}%")
-    lines.append(f"MCC: {test_direction_metrics['mcc']:.4f}")
-    lines.append(f"MCC (train set): {train_direction_metrics['mcc']:.4f}")
-    lines.append(f"Log loss: {test_direction_metrics['log_loss']:.4f}")
-    lines.append(f"ROC-AUC: {test_direction_metrics['roc_auc']:.4f}")
+
+    negative_probs = test_results["prob"][test_results["true"] == 0]
+    positive_probs = test_results["prob"][test_results["true"] == 1]
     lines.append(
-        f"\nConfusion matrix:\n{format_confusion_matrix(test_direction_metrics['confusion_matrix'], ['Real 0', 'Real 1'], ['Pred 0', 'Pred 1'])}"
+        f"True={class_names[0]}: avg P({class_names[0]})={safe_mean(1 - negative_probs):.3f} "
+        f"P({class_names[1]})={safe_mean(negative_probs):.3f}"
     )
-    direction_negative = test_results["direction_prob"][test_results["direction_true"] == 0]
-    direction_positive = test_results["direction_prob"][test_results["direction_true"] == 1]
-    lines.append(f"True=down: avg P(up)={safe_mean(direction_negative):.3f}")
-    lines.append(f"True=up: avg P(up)={safe_mean(direction_positive):.3f}")
+    lines.append(
+        f"True={class_names[1]}: avg P({class_names[0]})={safe_mean(1 - positive_probs):.3f} "
+        f"P({class_names[1]})={safe_mean(positive_probs):.3f}"
+    )
 
     output = "\n".join(lines) + "\n"
     print("\n" + output)
@@ -543,7 +484,7 @@ def main():
         with open(script_dir / "results/test_metrics.log", "a") as log_file:
             log_file.write(output + "\n")
 
-    pretrained_path = script_dir / f"models/pretrained/PatchTST_pretrained_{granularity}_{year_now}_v{version}.pt"
+    pretrained_path = script_dir / f"models/pretrained/{task['mode_name']}_PatchTST_pretrained_{granularity}_{year_now}_v{version}.pt"
     pretrained_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -556,6 +497,8 @@ def main():
                 "core_std": pretrain_core_std.squeeze(0).tolist(),
             },
             "metadata": {
+                "mode": task["mode_name"],
+                "binary": binary,
                 "pretrain_pairs": pretrain_pairs,
                 "granularity": granularity,
                 "year_now": year_now,
@@ -565,7 +508,7 @@ def main():
         pretrained_path,
     )
 
-    model_path = script_dir / f"models/{target_instrument}/PatchTST_{target_instrument}_{granularity}_{year_now}_v{version}.pt"
+    model_path = script_dir / f"models/{target_instrument}/{task['mode_name']}_PatchTST_{target_instrument}_{granularity}_{year_now}_v{version}.pt"
     model_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -580,6 +523,8 @@ def main():
                 "corr_std": finetune_corr_std.squeeze(0).tolist(),
             },
             "metadata": {
+                "mode": task["mode_name"],
+                "binary": binary,
                 "target_instrument": target_instrument,
                 "pretrain_pairs": pretrain_pairs,
                 "corr_pair": corr_pair,

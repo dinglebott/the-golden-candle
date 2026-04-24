@@ -64,7 +64,16 @@ def load_raw_dataframe(instrument, granularity, year_now):
     return dataparser.parseData(raw_path)
 
 
-def prepare_multitask_dataframe(instrument, granularity, year_now, k_value, n_value, corr_pair=0, include_corr_features=False):
+def prepare_task_dataframe(
+    instrument,
+    granularity,
+    year_now,
+    k_value,
+    n_value,
+    binary,
+    corr_pair=0,
+    include_corr_features=False,
+):
     df = load_raw_dataframe(instrument, granularity, year_now)
 
     if include_corr_features and isinstance(corr_pair, str):
@@ -73,25 +82,30 @@ def prepare_multitask_dataframe(instrument, granularity, year_now, k_value, n_va
     elif include_corr_features and corr_pair != 0:
         raise ValueError("corr_pair must be 0 or a valid currency pair string")
 
-    gate_df = dataparser.addGateTarget(df.copy(), k_value, n_value)
-    direction_df = dataparser.addDirectionTarget(df.copy(), k_value, n_value)[["time", "target"]]
-    direction_df = direction_df.rename(columns={"target": "direction_target"})
+    if binary == 0:
+        df = dataparser.addGateTarget(df, k_value, n_value)
+        df["target_mask"] = 1.0
+    elif binary == 1:
+        gate_df = dataparser.addGateTarget(df.copy(), k_value, n_value)
+        direction_df = dataparser.addDirectionTarget(df.copy(), k_value, n_value)[["time", "target"]]
+        direction_df = direction_df.rename(columns={"target": "direction_target"})
 
-    combined = gate_df.merge(direction_df, on="time", how="left")
-    combined["direction_mask"] = combined["direction_target"].notna().astype(np.float32)
-    combined["direction_target"] = combined["direction_target"].fillna(0).astype(np.int64)
-    combined["gate_target"] = combined["target"].astype(np.int64)
-    combined.drop(columns=["target"], inplace=True)
-    combined.reset_index(drop=True, inplace=True)
-    return combined
+        df = gate_df.merge(direction_df, on="time", how="left")
+        df["target_mask"] = df["direction_target"].notna().astype(np.float32)
+        df["target"] = df["direction_target"].fillna(0).astype(np.int64)
+        df.drop(columns=["direction_target"], inplace=True)
+    else:
+        raise ValueError("binary must be 0 or 1")
+
+    df.reset_index(drop=True, inplace=True)
+    return df
 
 
 def make_split_bundle(df, core_features, corr_features, lookback, train_split, val_split, purge_gap):
     core_matrix = df[core_features].to_numpy(dtype=np.float32)
     corr_matrix = df[corr_features].to_numpy(dtype=np.float32) if corr_features else None
-    gate_targets = df["gate_target"].to_numpy(dtype=np.float32)
-    direction_targets = df["direction_target"].to_numpy(dtype=np.float32)
-    direction_mask = df["direction_mask"].to_numpy(dtype=np.float32)
+    targets = df["target"].to_numpy(dtype=np.float32)
+    target_mask = df["target_mask"].to_numpy(dtype=np.float32)
 
     total_rows = len(df)
     min_target_idx = lookback - 1
@@ -111,12 +125,16 @@ def make_split_bundle(df, core_features, corr_features, lookback, train_split, v
         start_idx = max(start_idx, min_target_idx)
         if end_idx <= start_idx:
             raise ValueError("One of the dataset splits is empty after applying the lookback window")
-        return np.arange(start_idx, end_idx, dtype=np.int64)
+        indices = np.arange(start_idx, end_idx, dtype=np.int64)
+        masked_indices = indices[target_mask[indices] > 0.5]
+        if len(masked_indices) == 0:
+            raise ValueError("One of the dataset splits has no valid target samples after masking")
+        return masked_indices
 
     return {
-        "train": SplitData(core_matrix, corr_matrix, gate_targets, direction_targets, direction_mask, build_indices(min_target_idx, train_end - purge_gap)),
-        "val": SplitData(core_matrix, corr_matrix, gate_targets, direction_targets, direction_mask, build_indices(train_end, val_end - purge_gap)),
-        "test": SplitData(core_matrix, corr_matrix, gate_targets, direction_targets, direction_mask, build_indices(val_end, total_rows)),
+        "train": SplitData(core_matrix, corr_matrix, targets, build_indices(min_target_idx, train_end - purge_gap)),
+        "val": SplitData(core_matrix, corr_matrix, targets, build_indices(train_end, val_end - purge_gap)),
+        "test": SplitData(core_matrix, corr_matrix, targets, build_indices(val_end, total_rows)),
         "train_end": train_end,
         "val_end": val_end,
     }
