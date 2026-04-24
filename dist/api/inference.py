@@ -26,7 +26,7 @@ def loadModels():
 
     # load patchtst gate
     checkpoint = torch.load(
-        GATE_ARTIFACTS / f"gate_PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt",
+        GATE_ARTIFACTS / f"PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt",
         map_location="cpu",
         weights_only=False,
     )
