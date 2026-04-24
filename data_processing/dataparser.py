@@ -164,6 +164,45 @@ def parseData(jsonData):
     df["fast_pct_R"] = fastR.ewm(span=7, adjust=False).mean() + 50
     df["slow_pct_R"] = slowR.ewm(span=3, adjust=False).mean() + 50
 
+    # Directional features
+    eps = 1e-10
+    candle_range = (df["high"] - df["low"]).clip(lower=eps)
+    prev_high_24 = df["high"].rolling(24).max().shift(1)
+    prev_low_24 = df["low"].rolling(24).min().shift(1)
+    prev_range_24 = (prev_high_24 - prev_low_24).clip(lower=eps)
+    signed_return = np.sign(df["close_return"])
+
+    # Intrabar directional pressure
+    df["body_to_range"] = (df["close"] - df["open"]) / candle_range
+    df["close_in_bar"] = ((df["close"] - df["low"]) / candle_range) - 0.5
+
+    # Multi-horizon directional momentum
+    df["cum_return_3"] = np.log(df["close"] / df["close"].shift(3))
+    df["cum_return_6"] = np.log(df["close"] / df["close"].shift(6))
+    df["cum_return_12"] = np.log(df["close"] / df["close"].shift(12))
+    df["cum_return_24"] = np.log(df["close"] / df["close"].shift(24))
+    df["return_accel_3_12"] = df["cum_return_3"] - (df["cum_return_12"] / 4)
+
+    # Trend slope proxies from existing moving averages
+    ema15 = getEma(15)
+    ema50 = getEma(50)
+    df["ema15_slope_3"] = np.log(ema15 / ema15.shift(3))
+    df["ema50_slope_5"] = np.log(ema50 / ema50.shift(5))
+
+    # Breakout and range-location context
+    df["breakout_dist_high_24"] = np.log(df["close"] / prev_high_24)
+    df["breakout_dist_low_24"] = np.log(df["close"] / prev_low_24)
+    df["range_pos_24"] = ((df["close"] - prev_low_24) / prev_range_24) - 0.5
+
+    # Directional persistence / impulse quality
+    df["momentum_consistency_8"] = signed_return.rolling(8).mean()
+    df["vol_adj_return_6"] = df["cum_return_6"] / (df["atr_14"] * np.sqrt(6) + eps)
+    df["trend_pressure_8"] = df["body_to_range"].rolling(8).mean()
+    df["return_zscore_24"] = (
+        (df["close_return"] - df["close_return"].rolling(24).mean()) /
+        (df["close_return"].rolling(24).std() + eps)
+    )
+
     # drop empty rows and return
     df.dropna(inplace=True)
     return df

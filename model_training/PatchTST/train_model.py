@@ -139,6 +139,12 @@ def compute_binary_metrics(y_true, y_prob):
     return metrics
 
 
+def count_parameters(model):
+    total_params = sum(parameter.numel() for parameter in model.parameters())
+    trainable_params = sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
+    return total_params, trainable_params
+
+
 def format_confusion_matrix(cmatrix, row_labels, col_labels):
     df = pd.DataFrame(cmatrix, index=row_labels, columns=col_labels)
     df["Count"] = df.sum(axis=1)
@@ -333,6 +339,7 @@ def main():
     log_metrics = env["log_metrics"]
     corr_pair = env["corr_pair"]
     version = patchtst_env["train_version"]
+    skip_pretrain = patchtst_env.get("skip_pretrain", False)
 
     if binary not in TASK_CONFIG:
         raise ValueError("binary must be 0 or 1")
@@ -350,47 +357,55 @@ def main():
         device_name = "cpu"
     device = torch.device(device_name)
 
-    pretrain_bundles = []
-    for instrument in tqdm(pretrain_pairs, desc="Preparing pretrain datasets", total=len(pretrain_pairs)):
-        df = prepare_task_dataframe(
-            instrument,
-            granularity,
-            year_now,
-            k_value,
-            purge_gap,
-            binary,
-            corr_pair=0,
-            include_corr_features=False,
-        )
-        pretrain_bundles.append(
-            make_split_bundle(df, core_features, [], config["lookback"], train_split, val_split, purge_gap)
-        )
-
-    pretrain_core_mean, pretrain_core_std = compute_train_stats(pretrain_bundles, "core")
-    empty_corr_mean = np.zeros((1, 0), dtype=np.float32)
-    empty_corr_std = np.zeros((1, 0), dtype=np.float32)
-    pretrain_loaders = build_stage_loaders(
-        pretrain_bundles,
-        config,
-        "pretrain",
-        pretrain_core_mean,
-        pretrain_core_std,
-        empty_corr_mean,
-        empty_corr_std,
-    )
-
-    pretrain_targets = gather_stage_targets(pretrain_bundles, "train")
-    pretrain_pos_weight = torch.tensor(compute_pos_weight(pretrain_targets), dtype=torch.float32, device=device)
-
     model = PatchTST(len(core_features), len(corr_features), config).to(device)
-    pretrain_summary = train_stage(
-        model,
-        pretrain_loaders,
-        device,
-        pretrain_pos_weight,
-        config,
-        "pretrain",
-    )
+    pretrain_summary = None
+    pretrain_core_mean = None
+    pretrain_core_std = None
+    if not skip_pretrain:
+        pretrain_bundles = []
+        for instrument in tqdm(pretrain_pairs, desc="Preparing pretrain datasets", total=len(pretrain_pairs)):
+            df = prepare_task_dataframe(
+                instrument,
+                granularity,
+                year_now,
+                k_value,
+                purge_gap,
+                binary,
+                corr_pair=0,
+                include_corr_features=False,
+            )
+            pretrain_bundles.append(
+                make_split_bundle(df, core_features, [], config["lookback"], train_split, val_split, purge_gap)
+            )
+
+        pretrain_core_mean, pretrain_core_std = compute_train_stats(pretrain_bundles, "core")
+        empty_corr_mean = np.zeros((1, 0), dtype=np.float32)
+        empty_corr_std = np.zeros((1, 0), dtype=np.float32)
+        pretrain_loaders = build_stage_loaders(
+            pretrain_bundles,
+            config,
+            "pretrain",
+            pretrain_core_mean,
+            pretrain_core_std,
+            empty_corr_mean,
+            empty_corr_std,
+        )
+
+        pretrain_targets = gather_stage_targets(pretrain_bundles, "train")
+        pretrain_pos_weight = torch.tensor(compute_pos_weight(pretrain_targets), dtype=torch.float32, device=device)
+
+        total_params, trainable_params = count_parameters(model)
+        print(f"Pretrain params | total={total_params:,} | trainable={trainable_params:,}")
+        pretrain_summary = train_stage(
+            model,
+            pretrain_loaders,
+            device,
+            pretrain_pos_weight,
+            config,
+            "pretrain",
+        )
+    else:
+        print("Skipping pretraining and proceeding directly to finetuning.")
 
     print("Preparing finetune dataset...")
     target_df = prepare_task_dataframe(
@@ -425,12 +440,15 @@ def main():
         finetune_corr_std,
     )
 
-    model.load_state_dict(pretrain_summary["best_state"])
-    model.freeze_for_finetune(config["finetune_unfreeze_shared_blocks"])
+    if pretrain_summary is not None:
+        model.load_state_dict(pretrain_summary["best_state"])
+        model.freeze_for_finetune(config["finetune_unfreeze_shared_blocks"])
 
     finetune_targets = gather_stage_targets([target_bundle], "train")
     finetune_pos_weight = torch.tensor(compute_pos_weight(finetune_targets), dtype=torch.float32, device=device)
 
+    total_params, trainable_params = count_parameters(model)
+    print(f"Finetune params | total={total_params:,} | trainable={trainable_params:,}")
     finetune_summary = train_stage(
         model,
         finetune_loaders,
@@ -464,10 +482,10 @@ def main():
         f"=== v{version} | {target_instrument} {granularity} | {task['mode_name']} | "
         f"PatchTST pretrain+finetune | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ==="
     )
-    lines.append(f"Pretrain pairs: {', '.join(pretrain_pairs)}")
+    lines.append(f"Pretrain pairs: {', '.join(pretrain_pairs) if not skip_pretrain else 'skipped'}")
     lines.append(f"Finetune target: {target_instrument}")
     lines.append(f"Correlated pair adapter: {corr_pair if corr_features else 'disabled'}")
-    lines.append(f"Pretrain best epoch: {pretrain_summary['best_epoch']}")
+    lines.append(f"Pretrain best epoch: {pretrain_summary['best_epoch'] if pretrain_summary is not None else 'skipped'}")
     lines.append(f"Finetune best epoch: {finetune_summary['best_epoch']}")
     lines.append(f"Core features: {len(core_features)} | Corr features: {len(corr_features)}")
     lines.append(f"Lookback: {config['lookback']} | Patch length: {config['patch_len']} | Patch stride: {config['patch_stride']}")
@@ -505,29 +523,30 @@ def main():
         with open(script_dir / "results/test_metrics.log", "a") as log_file:
             log_file.write(output + "\n")
 
-    pretrained_path = script_dir / f"models/pretrained/{task['mode_name']}_PatchTST_pretrained_{granularity}_{year_now}_v{version}.pt"
-    pretrained_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model_state_dict": pretrain_summary["best_state"],
-            "config": config,
-            "core_features": core_features,
-            "corr_features": [],
-            "normalization": {
-                "core_mean": pretrain_core_mean.squeeze(0).tolist(),
-                "core_std": pretrain_core_std.squeeze(0).tolist(),
+    if pretrain_summary is not None:
+        pretrained_path = script_dir / f"models/pretrained/{task['mode_name']}_PatchTST_pretrained_{granularity}_{year_now}_v{version}.pt"
+        pretrained_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "model_state_dict": pretrain_summary["best_state"],
+                "config": config,
+                "core_features": core_features,
+                "corr_features": [],
+                "normalization": {
+                    "core_mean": pretrain_core_mean.squeeze(0).tolist(),
+                    "core_std": pretrain_core_std.squeeze(0).tolist(),
+                },
+                "metadata": {
+                    "mode": task["mode_name"],
+                    "binary": binary,
+                    "pretrain_pairs": pretrain_pairs,
+                    "granularity": granularity,
+                    "year_now": year_now,
+                    "best_epoch": pretrain_summary["best_epoch"],
+                },
             },
-            "metadata": {
-                "mode": task["mode_name"],
-                "binary": binary,
-                "pretrain_pairs": pretrain_pairs,
-                "granularity": granularity,
-                "year_now": year_now,
-                "best_epoch": pretrain_summary["best_epoch"],
-            },
-        },
-        pretrained_path,
-    )
+            pretrained_path,
+        )
 
     model_path = script_dir / f"models/{target_instrument}/{task['mode_name']}_PatchTST_{target_instrument}_{granularity}_{year_now}_v{version}.pt"
     model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -547,11 +566,12 @@ def main():
                 "mode": task["mode_name"],
                 "binary": binary,
                 "target_instrument": target_instrument,
-                "pretrain_pairs": pretrain_pairs,
+                "pretrain_pairs": pretrain_pairs if not skip_pretrain else [],
                 "corr_pair": corr_pair,
                 "granularity": granularity,
                 "year_now": year_now,
-                "pretrain_best_epoch": pretrain_summary["best_epoch"],
+                "skip_pretrain": skip_pretrain,
+                "pretrain_best_epoch": pretrain_summary["best_epoch"] if pretrain_summary is not None else None,
                 "finetune_best_epoch": finetune_summary["best_epoch"],
                 "finetune_unfreeze_shared_blocks": config["finetune_unfreeze_shared_blocks"],
             },

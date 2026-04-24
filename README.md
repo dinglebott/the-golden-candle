@@ -62,8 +62,14 @@ First, set the correct config variables in `env.json`. Below are the variables t
 Next, manually curate a set of features and hyperparameters, placed in the correctly-versioned subfolder (`train_version`). Copy the format you see in `model_configs/`. Also copy the naming scheme (prefix with "gate" or "dir" depending on which binary task you are training for).\
 You can use `select_features.py` and `tune_params.py` to assist with your curation.\
 Now you are ready to train. Run `train_model.py` and the model will be saved to `models/`, sorted by instrument.
+
 ### Deployment
 To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.\
 To deploy it to the site, add an entry in the `web_interface/js/config.js` file, inside the `MODEL_CONFIGS` array. Copy the format of the existing models.\
 *Note: only Git pushes to the `dist/` folder trigger a server-side rebuild and relaunch. Configure this from the Railway dashboard, under "Watch Paths".*\
 <br/>
+
+
+## DEPLOYMENT CHANGELOG
+### 1.0
+- Added first model - Gate-XGBoost v1

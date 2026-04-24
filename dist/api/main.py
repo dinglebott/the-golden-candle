@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Golden Candle API",
-    version="1.0.0",
+    version="1.0",
     lifespan=lifespan
 )
 
