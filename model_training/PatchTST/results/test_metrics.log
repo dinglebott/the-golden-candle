@@ -24,3 +24,29 @@ Count     5770    7661  13431
 True=flat: avg P(flat)=0.603 P(directional)=0.397
 True=directional: avg P(flat)=0.304 P(directional)=0.696
 
+=== v1 | EUR_USD H1 | dir | PatchTST pretrain+finetune | 2026-04-24 10:56:49 ===
+Pretrain pairs: AUD_USD, EUR_USD, GBP_USD, USD_CHF, USD_JPY
+Finetune target: EUR_USD
+Correlated pair adapter: GBP_USD
+Pretrain best epoch: 1
+Finetune best epoch: 1
+Core features: 34 | Corr features: 4
+Lookback: 96 | Patch length: 8 | Patch stride: 8
+Shared blocks: 2 | Task blocks: 2
+Purged split gap: 6
+
+Direction task
+Balanced accuracy: 50.84%
+MCC: 0.0168
+MCC (train set): 0.0427
+Log loss: 0.6934
+ROC-AUC: 0.5113
+
+Confusion matrix:
+        Pred 0  Pred 1  Count
+Real 0    2094    1752   3846
+Real 1    2074    1856   3930
+Count     4168    3608   7776
+True=down: avg P(down)=0.503 P(up)=0.497
+True=up: avg P(down)=0.503 P(up)=0.497
+
