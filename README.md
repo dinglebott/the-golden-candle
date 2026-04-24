@@ -60,8 +60,14 @@ First, set the correct config variables in `env.json`. Below are the variables t
 - `train_version` - Controls the version name of the model produced when running `train_model.py`
 - `use_version` - Controls the model version used when running `use_model.py`
 Next, manually curate a set of features and hyperparameters, placed in the correctly-versioned subfolder (`train_version`). Copy the format you see in `model_configs/`. Also copy the naming scheme (prefix with "gate" or "dir" depending on which binary task you are training for).\
-You can use `select_features.py` and `tune_params.py` to assist with your curation.\
+You can use `select_features.py` and `tune_params.py` to assist with your curation. See below for details.\
 Now you are ready to train. Run `train_model.py` and the model will be saved to `models/`, sorted by instrument.
+
+### Tuning
+| &nbsp; | `select_features.py` | `tune_params.py` |
+| --- | --- | --- |
+| XGBoost | SHAP importances | Optuna - Feature set follows `train_version` |
+| PatchTST | Permutation importances - Model and feature set follow `use_version` | Optuna - Feature set follows `train_version`, use --trials flag to control no. of trials (default 50) |
 
 ### Deployment
 To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.\
