@@ -65,4 +65,5 @@ Now you are ready to train. Run `train_model.py` and the model will be saved to 
 ### Deployment
 To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.\
 To deploy it to the site, add an entry in the `web_interface/js/config.js` file, inside the `MODEL_CONFIGS` array. Copy the format of the existing models.\
+*Note: only Git pushes to the `dist/` folder trigger a server-side rebuild and relaunch. Configure this from the Railway dashboard, under "Watch Paths".*\
 <br/>
