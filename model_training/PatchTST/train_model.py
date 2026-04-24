@@ -14,7 +14,6 @@ from tqdm.auto import tqdm
 
 from classes import PatchTST, WindowedTimeSeriesDataset
 from data_utils import (
-    CORE_FEATURES,
     compute_train_stats,
     get_corr_feature_names,
     make_split_bundle,
@@ -69,6 +68,19 @@ TASK_CONFIG = {
     },
 }
 
+DEFAULT_CORE_FEATURES = [
+    "open_return", "high_return", "low_return", "close_return", "vol_return",
+    "atr_14", "volatility_regime",
+    "bb_width", "bb_position",
+    "hl_spread", "upper_wick", "lower_wick",
+    "dist_ema15", "dist_ema50", "ema_cross",
+    "dist_smooth14", "dist_smooth35", "smooth_cross",
+    "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx", "di_diff",
+    "fast_pct_R", "slow_pct_R",
+    "close_lag1", "close_lag2", "close_lag3", "close_lag4",
+    "vol_lag1", "vol_lag2", "vol_lag3", "vol_lag4",
+]
+
 
 def safe_mean(values):
     return float(np.mean(values)) if len(values) > 0 else float("nan")
@@ -79,9 +91,17 @@ def load_env():
         return json.load(file)
 
 
-def load_training_params(version):
+def load_task_features(version, mode_name):
+    config_path = Path(__file__).parent / f"model_configs/v{version}/{mode_name}_features.json"
+    if config_path.exists():
+        with open(config_path, "r") as file:
+            return json.load(file)["features"]
+    return list(DEFAULT_CORE_FEATURES)
+
+
+def load_task_params(version, mode_name):
     params = dict(DEFAULT_PARAMS)
-    config_path = Path(__file__).parent / f"model_configs/v{version}/params.json"
+    config_path = Path(__file__).parent / f"model_configs/v{version}/{mode_name}_params.json"
     if config_path.exists():
         with open(config_path, "r") as file:
             params.update(json.load(file))
@@ -318,7 +338,8 @@ def main():
         raise ValueError("binary must be 0 or 1")
 
     task = TASK_CONFIG[binary]
-    config = load_training_params(version)
+    config = load_task_params(version, task["mode_name"])
+    core_features = load_task_features(version, task["mode_name"])
     target_instrument = resolve_target_instrument(env)
     pretrain_pairs = resolve_pretrain_pairs(env)
     corr_features = get_corr_feature_names(corr_pair) if isinstance(corr_pair, str) else []
@@ -342,7 +363,7 @@ def main():
             include_corr_features=False,
         )
         pretrain_bundles.append(
-            make_split_bundle(df, CORE_FEATURES, [], config["lookback"], train_split, val_split, purge_gap)
+            make_split_bundle(df, core_features, [], config["lookback"], train_split, val_split, purge_gap)
         )
 
     pretrain_core_mean, pretrain_core_std = compute_train_stats(pretrain_bundles, "core")
@@ -361,7 +382,7 @@ def main():
     pretrain_targets = gather_stage_targets(pretrain_bundles, "train")
     pretrain_pos_weight = torch.tensor(compute_pos_weight(pretrain_targets), dtype=torch.float32, device=device)
 
-    model = PatchTST(len(CORE_FEATURES), len(corr_features), config).to(device)
+    model = PatchTST(len(core_features), len(corr_features), config).to(device)
     pretrain_summary = train_stage(
         model,
         pretrain_loaders,
@@ -384,7 +405,7 @@ def main():
     )
     target_bundle = make_split_bundle(
         target_df,
-        CORE_FEATURES,
+        core_features,
         corr_features,
         config["lookback"],
         train_split,
@@ -448,7 +469,7 @@ def main():
     lines.append(f"Correlated pair adapter: {corr_pair if corr_features else 'disabled'}")
     lines.append(f"Pretrain best epoch: {pretrain_summary['best_epoch']}")
     lines.append(f"Finetune best epoch: {finetune_summary['best_epoch']}")
-    lines.append(f"Core features: {len(CORE_FEATURES)} | Corr features: {len(corr_features)}")
+    lines.append(f"Core features: {len(core_features)} | Corr features: {len(corr_features)}")
     lines.append(f"Lookback: {config['lookback']} | Patch length: {config['patch_len']} | Patch stride: {config['patch_stride']}")
     lines.append(f"Shared blocks: {config['base_encoder_blocks']} | Task blocks: {config['branch_encoder_blocks']}")
     lines.append(f"Purged split gap: {purge_gap}")
@@ -490,7 +511,7 @@ def main():
         {
             "model_state_dict": pretrain_summary["best_state"],
             "config": config,
-            "core_features": CORE_FEATURES,
+            "core_features": core_features,
             "corr_features": [],
             "normalization": {
                 "core_mean": pretrain_core_mean.squeeze(0).tolist(),
@@ -514,7 +535,7 @@ def main():
         {
             "model_state_dict": model.state_dict(),
             "config": config,
-            "core_features": CORE_FEATURES,
+            "core_features": core_features,
             "corr_features": corr_features,
             "normalization": {
                 "core_mean": finetune_core_mean.squeeze(0).tolist(),

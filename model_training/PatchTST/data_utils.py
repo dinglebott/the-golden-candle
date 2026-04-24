@@ -11,20 +11,6 @@ from classes import SplitData
 ROOT_DIR = Path(__file__).parent.parent.parent
 RAW_DATA_DIR = ROOT_DIR / "raw_data"
 
-CORE_FEATURES = [
-    "open_return", "high_return", "low_return", "close_return", "vol_return",
-    "atr_14", "volatility_regime",
-    "bb_width", "bb_position",
-    "hl_spread", "upper_wick", "lower_wick",
-    "dist_ema15", "dist_ema50", "ema_cross",
-    "dist_smooth14", "dist_smooth35", "smooth_cross",
-    "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx", "di_diff",
-    "fast_pct_R", "slow_pct_R",
-    "close_lag1", "close_lag2", "close_lag3", "close_lag4",
-    "vol_lag1", "vol_lag2", "vol_lag3", "vol_lag4",
-]
-
-
 def infer_available_pairs(granularity):
     pairs = []
     for file_path in sorted(RAW_DATA_DIR.glob(f"*_{granularity}_*.json")):
