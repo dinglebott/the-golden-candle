@@ -8,25 +8,23 @@ The model architectures used are explained below:
 - **PatchTST** (Patch Time Series Transformer) breaks time series into smaller patches, which serve as input tokens. The transformer backbone uses a combination of encoder and decoder blocks to understand the data and generate predicted data. The encoder prominently uses self-attention heads, which allow it to understand cross-token context. Finally, the output goes through an output head which produces forecasted values, or classification probabilities in this project.
 <br/>
 
+
 ## PROJECT STRUCTURE
 ### Root
 `data_processing/` - Functions to fetch and process data, shared across all pipelines\
 `model_training/` - Full pipelines for training and testing, sorted by model architecture\
 `raw_data/` - Historical OHLCV data, pulled from the OANDA API\
 `env.json` - Config variables, including shared configs and pipeline-specific configs (see below for details)
-### Pipeline
+
+### Training pipeline
 `select_features.py` - Feature selection tool\
 `tune_params.py` - Hyperparameter tuning (Optuna)\
 `results/` - Output location for feature selection, hyperparameter tuning, model test metrics\
 `model_configs/` - Manually curated feature sets and hyperparameters, sorted by version\
 `train_model.py` - Trains and tests a new model\
 `models/` - Trained models, named by version number as set in configs\
-`use_model.py` - Run live inference with a trained model\
-<br/>
+`use_model.py` - Run live inference with a trained model
 
-**PatchTST:**
-- `classes.py` - Classes for datasets and transformer blocks (encoder, heads)
-- `data_utils.py` - Finds other forex pairs for pre-training, prepares datasets (features, splitting, normalisation)
 ### Deployment
 `dist/` - Server-side Docker container
 - `api/` - Pulls live data, runs inference, returns response
@@ -38,6 +36,7 @@ The model architectures used are explained below:
 - `ui.js` - Draws to DOM
 - `main.js` - Entry point
 <br/>
+
 
 ## METHODOLOGY
 ### Labelling
