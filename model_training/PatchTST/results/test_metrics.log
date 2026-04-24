@@ -1,0 +1,41 @@
+=== v1 | EUR_USD H1 | PatchTST pretrain+finetune | 2026-04-24 09:28:14 ===
+Pretrain pairs: AUD_USD, EUR_USD, GBP_USD, USD_CHF, USD_JPY
+Finetune target: EUR_USD
+Correlated pair adapter: GBP_USD
+Pretrain best epoch: 6
+Finetune best epoch: 4
+Core features: 34 | Corr features: 4
+Lookback: 96 | Patch length: 8 | Patch stride: 8
+Shared blocks: 2 | Blocks per head: 2
+Purged split gap: 6
+
+Gate head (flat vs directional)
+Balanced accuracy: 74.05%
+MCC: 0.4801
+MCC (train set): 0.5078
+Log loss: 0.5352
+ROC-AUC: 0.8013
+
+Confusion matrix:
+        Pred 0  Pred 1  Count
+Real 0    3990    1665   5655
+Real 1    1746    6030   7776
+Count     5736    7695  13431
+True=flat: avg P(directional)=0.395
+True=directional: avg P(directional)=0.692
+
+Direction head (down vs up | directional samples only)
+Balanced accuracy: 50.68%
+MCC: 0.0137
+MCC (train set): 0.1279
+Log loss: 0.6991
+ROC-AUC: 0.5101
+
+Confusion matrix:
+        Pred 0  Pred 1  Count
+Real 0    1910    1936   3846
+Real 1    1898    2032   3930
+Count     3808    3968   7776
+True=down: avg P(up)=0.503
+True=up: avg P(up)=0.507
+

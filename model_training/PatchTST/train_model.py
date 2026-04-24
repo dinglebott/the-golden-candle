@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F
 from sklearn.metrics import balanced_accuracy_score, confusion_matrix, log_loss, matthews_corrcoef, roc_auc_score
 from torch.utils.data import ConcatDataset, DataLoader
+from tqdm.auto import tqdm
 
 from classes import MultiTaskPatchTST, WindowedTimeSeriesDataset
 from data_utils import (
@@ -122,10 +123,16 @@ def format_confusion_matrix(cmatrix, row_labels, col_labels):
 
 
 def build_datasets(split_bundles, lookback, core_mean, core_std, corr_mean, corr_std, split_name):
-    datasets = [
-        WindowedTimeSeriesDataset(bundle[split_name], lookback, core_mean, core_std, corr_mean, corr_std)
-        for bundle in split_bundles
-    ]
+    datasets = []
+    for bundle in tqdm(
+        split_bundles,
+        desc=f"Building {split_name} datasets",
+        total=len(split_bundles),
+        leave=False,
+    ):
+        datasets.append(
+            WindowedTimeSeriesDataset(bundle[split_name], lookback, core_mean, core_std, corr_mean, corr_std)
+        )
     if len(datasets) == 1:
         return datasets[0]
     return ConcatDataset(datasets)
@@ -175,7 +182,17 @@ def gather_stage_targets(split_bundles, split_name):
     return gate_labels, direction_targets, direction_masks
 
 
-def run_epoch(model, loader, device, gate_pos_weight, direction_pos_weight, loss_weights, optimizer=None, grad_clip=None):
+def run_epoch(
+    model,
+    loader,
+    device,
+    gate_pos_weight,
+    direction_pos_weight,
+    loss_weights,
+    optimizer=None,
+    grad_clip=None,
+    desc=None,
+):
     is_training = optimizer is not None
     model.train(is_training)
 
@@ -186,7 +203,8 @@ def run_epoch(model, loader, device, gate_pos_weight, direction_pos_weight, loss
     total_loss = 0.0
     total_samples = 0
 
-    for batch in loader:
+    progress = tqdm(loader, desc=desc, total=len(loader), leave=False)
+    for batch in progress:
         core_inputs = batch["core_inputs"].to(device)
         corr_inputs = batch["corr_inputs"].to(device)
         gate_target = batch["gate_target"].to(device)
@@ -218,6 +236,7 @@ def run_epoch(model, loader, device, gate_pos_weight, direction_pos_weight, loss
         batch_size = core_inputs.size(0)
         total_loss += float(loss.detach().cpu()) * batch_size
         total_samples += batch_size
+        progress.set_postfix(loss=f"{total_loss / max(total_samples, 1):.4f}")
 
         gate_probabilities.append(torch.sigmoid(gate_logits).detach().cpu().numpy())
         gate_targets.append(gate_target.detach().cpu().numpy())
@@ -252,7 +271,8 @@ def train_stage(model, loaders, device, gate_pos_weight, direction_pos_weight, c
     best_val_loss = math.inf
     patience_counter = 0
 
-    for epoch in range(1, config[f"{stage_name}_epochs"] + 1):
+    total_epochs = config[f"{stage_name}_epochs"]
+    for epoch in range(1, total_epochs + 1):
         train_results = run_epoch(
             model,
             loaders["train"],
@@ -262,6 +282,7 @@ def train_stage(model, loaders, device, gate_pos_weight, direction_pos_weight, c
             {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
             optimizer=optimizer,
             grad_clip=config["grad_clip"],
+            desc=f"{stage_name.capitalize()} {epoch}/{total_epochs} train",
         )
         val_results = run_epoch(
             model,
@@ -270,6 +291,7 @@ def train_stage(model, loaders, device, gate_pos_weight, direction_pos_weight, c
             gate_pos_weight,
             direction_pos_weight,
             {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
+            desc=f"{stage_name.capitalize()} {epoch}/{total_epochs} val",
         )
 
         print(
@@ -308,6 +330,7 @@ def evaluate_target_model(model, loaders, device, gate_pos_weight, direction_pos
         gate_pos_weight,
         direction_pos_weight,
         {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
+        desc="Evaluating train split",
     )
     test_results = run_epoch(
         model,
@@ -316,6 +339,7 @@ def evaluate_target_model(model, loaders, device, gate_pos_weight, direction_pos
         gate_pos_weight,
         direction_pos_weight,
         {"gate": config["gate_loss_weight"], "direction": config["direction_loss_weight"]},
+        desc="Evaluating test split",
     )
     return train_results, test_results
 
@@ -349,7 +373,7 @@ def main():
     device = torch.device(device_name)
 
     pretrain_bundles = []
-    for instrument in pretrain_pairs:
+    for instrument in tqdm(pretrain_pairs, desc="Preparing pretrain datasets", total=len(pretrain_pairs)):
         df = prepare_multitask_dataframe(
             instrument,
             granularity,
@@ -395,6 +419,7 @@ def main():
         "pretrain",
     )
 
+    print("Preparing finetune dataset...")
     target_df = prepare_multitask_dataframe(
         target_instrument,
         granularity,

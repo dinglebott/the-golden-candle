@@ -33,7 +33,7 @@ def infer_available_pairs(granularity):
 
 
 def resolve_target_instrument(env):
-    return env.get("patchtst", {}).get("finetune_instrument", env["instrument"])
+    return env["instrument"]
 
 
 def resolve_pretrain_pairs(env):
