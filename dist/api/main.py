@@ -41,8 +41,8 @@ app.add_middleware(
 )
 
 # guard against silent failure
-assert (GATE_ARTIFACTS / f"XGBoost_EUR_USD_H1_2026_v{xgbGateVersion}").exists(), \
-    f"XGB feature list not found for version {xgbGateVersion}"
+assert (GATE_ARTIFACTS / f"XGBoost_EUR_USD_H1_2026_v{xgbGateVersion}.json").exists(), \
+    f"XGB gate model not found for version {xgbGateVersion}"
 assert (GATE_ARTIFACTS / f"xgbFeatures_v{xgbGateVersion}.json").exists(), \
     f"XGB feature list not found for version {xgbGateVersion}"
 assert (GATE_ARTIFACTS / f"PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt").exists(), \
