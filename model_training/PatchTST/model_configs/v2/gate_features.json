@@ -1,5 +1,7 @@
 {
     "features": [
+        "tod_sin",
+        "tod_cos",
         "high_return",
         "low_return",
         "close_return",

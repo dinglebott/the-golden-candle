@@ -64,6 +64,11 @@ def parseData(jsonData):
     def getEma(period):
         return df["close"].ewm(span=period, adjust=False).mean()
     
+    # Time of day (UTC hour encoded as sin/cos pair)
+    hour = pd.to_datetime(df["time"]).dt.hour
+    df["tod_sin"] = np.sin(2 * np.pi * hour / 24)
+    df["tod_cos"] = np.cos(2 * np.pi * hour / 24)
+
     # Raw
     df["open_return"] = np.log(df["open"] / df["close"].shift(1))
     df["high_return"] = np.log(df["high"] / df["close"].shift(1))
