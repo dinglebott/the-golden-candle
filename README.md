@@ -77,5 +77,7 @@ To deploy it to the site, add an entry in the `web_interface/js/config.js` file,
 
 
 ## DEPLOYMENT CHANGELOG
+### 1.1
+- Added Gate-PatchTST v1
 ### 1.0
 - Added first model - Gate-XGBoost v1

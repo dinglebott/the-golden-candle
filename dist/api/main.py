@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 import json
 
-from api.inference import loadModels, predict
+from api.inference import loadModels, predict, predictPatchTST
 from api.models import PredictionResponse, CandleInfo
 from api.data_processing import getData, parseData, parseLiveCorrelated
 
@@ -15,6 +15,7 @@ DIR_ARTIFACTS = Path("artifacts/dir")
 K_VALUE = 1.5
 
 xgbGateVersion = 1
+patchTstGateVersion = 1
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Golden Candle API",
-    version="1.0",
+    version="1.1",
     lifespan=lifespan
 )
 
@@ -42,6 +43,8 @@ app.add_middleware(
 # guard against silent failure
 assert (GATE_ARTIFACTS / f"xgbFeatures_v{xgbGateVersion}.json").exists(), \
     f"XGB feature list not found for version {xgbGateVersion}"
+assert (GATE_ARTIFACTS / f"gate_PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt").exists(), \
+    f"PatchTST gate model not found for version {patchTstGateVersion}"
 
 @app.get("/health")
 def health():
@@ -60,11 +63,14 @@ def getPrediction():
         featuresDf = featuresDf.merge(df_corr, on="time", how="inner")
         xgbGateFeaturesDf = featuresDf[xgbGateFeatureList]
 
-        result = predict(xgbGateFeaturesDf)
+        xgbResult = predict(xgbGateFeaturesDf)
+        patchTstResult = predictPatchTST(featuresDf)
         return PredictionResponse(
-            **result,
+            **xgbResult,
+            xgbGateVersion=f"{xgbGateVersion}",
+            **patchTstResult,
+            patchTstGateVersion=f"{patchTstGateVersion}",
             timestamp=timestamp,
-            xgbGateVersion=f"{xgbGateVersion}"
         )
     except Exception as e:
         logger.error(f"Prediction failed: {e}")

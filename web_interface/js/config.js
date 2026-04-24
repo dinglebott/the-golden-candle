@@ -16,5 +16,16 @@ const MODEL_CONFIGS = [
             "0": { label: "FLAT", color: "#94a3b8" },
             "1": { label: "DIR",  color: "#4ade80" }
         }
+    },
+    {
+        id: "patchTstGate",
+        label: "PatchTST Gate",
+        versionKey: "patchTstGateVersion",
+        predKey: "patchTstGatePred",
+        probsKey: "patchTstGateProbs",
+        classes: {
+            "0": { label: "FLAT", color: "#94a3b8" },
+            "1": { label: "DIR",  color: "#4ade80" }
+        }
     }
 ];
