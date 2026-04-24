@@ -55,20 +55,11 @@ function updateCandle(data) {
     candleEnd.setHours(candleStart.getHours() + 1)
     // format
     startString = candleStart.toLocaleString("en-SG", {
-        day: "2-digit", month: "short",
         hour: "2-digit", minute: "2-digit", hour12: false
     })
-    // exclude date from endString if same day
-    if (candleEnd.getDate() == candleStart.getDate()) {
-        endString = candleEnd.toLocaleString("en-SG", {
-            hour: "2-digit", minute: "2-digit", hour12: false
-        })
-    } else {
-        endString = candleEnd.toLocaleString("en-SG", {
-            day: "2-digit", month: "short",
-            hour: "2-digit", minute: "2-digit", hour12: false
-        })
-    }
+    endString = candleEnd.toLocaleString("en-SG", {
+        hour: "2-digit", minute: "2-digit", hour12: false
+    })
     // write to DOM
     document.getElementById("candle-timestamp").textContent = `${startString} - ${endString} SGT`;
 }
