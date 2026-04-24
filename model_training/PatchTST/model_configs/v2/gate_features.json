@@ -1,0 +1,28 @@
+{
+    "features": [
+        "high_return",
+        "low_return",
+        "close_return",
+        "vol_return",
+        "atr_14",
+        "volatility_regime",
+        "bb_width",
+        "bb_position",
+        "hl_spread",
+        "upper_wick",
+        "lower_wick",
+        "dist_ema50",
+        "ema_cross",
+        "smooth_cross",
+        "rsi_14",
+        "vol_ratio",
+        "vol_momentum",
+        "adx",
+        "di_diff",
+        "close_lag1",
+        "close_lag4",
+        "vol_lag2",
+        "vol_lag3",
+        "vol_lag4"
+    ]
+}
