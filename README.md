@@ -67,7 +67,7 @@ Now you are ready to train. Run `train_model.py` and the model will be saved to 
 | &nbsp; | `select_features.py` | `tune_params.py` |
 | --- | --- | --- |
 | XGBoost | SHAP importances | Optuna - Feature set follows `train_version` |
-| PatchTST | Permutation importances - Model and feature set follow `use_version` | Optuna - Feature set follows `train_version`\nUse --trials flag to control no. of trials (default 50) |
+| PatchTST | Permutation importances - Model and feature set follow `use_version` | Optuna - Feature set follows `train_version`<br/>Use --trials flag to control no. of trials (default 50) |
 
 ### Deployment
 To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.\
