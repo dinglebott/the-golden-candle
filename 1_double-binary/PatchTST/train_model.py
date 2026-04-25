@@ -87,7 +87,7 @@ def safe_mean(values):
 
 
 def load_env():
-    with open(Path(__file__).parent.parent.parent / "env.json", "r") as file:
+    with open(Path(__file__).parent.parent / "env.json", "r") as file:
         return json.load(file)
 
 

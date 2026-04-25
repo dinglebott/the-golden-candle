@@ -1,31 +1,17 @@
 ## ABOUT PROJECT
-**GOAL:** Use machine learning to predict price movements in the forex market\
-This is a collection of training and testing pipelines for various model architectures (listed above). The problem is framed as two binary classifications. Firstly, will the price move significantly over the forecasting horizon? Secondly, given that it moves, does it move up or down?\
-Selected models are deployed to the repository website [The Golden Candle](https://dinglebott.github.io/the-golden-candle).\
-**IMPORTANT:** Please use the website responsibly, as each inference/site reload incurs server costs that come from my own pocket D:
+This is a collection of training and testing pipelines for various model architectures (listed above). I attempt various approaches to hopefully gain an edge over the forex market. The main focus of this research is the EUR/USD pair, although most of the pipelines can be easily configured to target other pairs. See below for the various problem framings and models I experimented with.\
+Selected models are deployed to the repository website [The Golden Candle](https://dinglebott.github.io/the-golden-candle). The deployment history is at the bottom of this README.\
+<br/>
 
-### Models
-- **XGBoost** uses a gradient-boosted decision tree framework. It builds decision trees sequentially, with each tree improving on the previous one via a gradient descent algorithm. As a traditional machine learning algorithm, it is faster than its modern deep learning counterparts, and performs well on structured, tabular data.
-- **CNN-LSTM** is a hybrid of Convolutional Neural Networks and Long Short-Term Memory networks, which are a variant of Recurrent Neural Networks. The CNN extracts local patterns and reduce noise. The output of the CNN is passed to the LSTM layers, which capture temporal patterns and long-term relationships. This makes them good for time series data like forex markets.
-- **PatchTST** (Patch Time Series Transformer) breaks time series into smaller patches, which serve as input tokens. The transformer backbone uses a combination of encoder and decoder blocks to understand the data and generate predicted data. The encoder prominently uses self-attention heads, which allow it to understand cross-token context. Finally, the output goes through an output head which produces forecasted values, or classification probabilities in this project.
+**IMPORTANT:** Please use the website responsibly, as each inference/site reload incurs server costs that come from my own pocket D:\
 <br/>
 
 
 ## PROJECT STRUCTURE
 ### Root
 `data_processing/` - Functions to fetch and process data, shared across all pipelines\
-`model_training/` - Full pipelines for training and testing, sorted by model architecture\
 `raw_data/` - Historical OHLCV data, pulled from the OANDA API\
-`env.json` - Config variables, including shared configs and pipeline-specific configs (see below for details)
-
-### Training pipeline
-`select_features.py` - Feature selection tool\
-`tune_params.py` - Hyperparameter tuning (Optuna)\
-`results/` - Output location for feature selection, hyperparameter tuning, model test metrics\
-`model_configs/` - Manually curated feature sets and hyperparameters, sorted by version\
-`train_model.py` - Trains and tests a new model\
-`models/` - Trained models, named by version number as set in configs\
-`use_model.py` - Run live inference with a trained model
+Experiments - Each experiment has its own folder, formatted as `<experiment-no.>_<experiment-name>`. See below for a summary of the experiments. Each one has its own README.md within its folder.
 
 ### Deployment
 `dist/` - Server-side Docker container
@@ -40,39 +26,20 @@ Selected models are deployed to the repository website [The Golden Candle](https
 <br/>
 
 
-## METHODOLOGY
-### Labelling
-The target variable is determined by triple-barrier labelling (Marcos López de Prado, 2018). Given parameters *k* and *n*, three barriers are set relative to the close price **C** of the latest candle - upper, lower, and time barrier. The upper and lower barriers are set *k* &times; ATR above and below **C**, and the time barrier is set *n* candles after the latest one. Labels are then computed based on which barrier is hit first.
-
-### Feature Engineering
+## EXPERIMENTS
+**#1 Double binary**\
+This experiment frames the problem as two binary classifications. Firstly, does the price move in a direction (up/down), or does it remain flat? Secondly, given that it moves in a direction, which direction did it move in?\
 <br/>
 
+**#2 Event detection**\
+This experiment filters out specific patterns using hardcoded criteria, then predicts the probability of the expected resolution for each instance.
+</br>
 
-## USAGE
-### Training
-First, set the correct config variables in `env.json`. Below are the variables that may need some clarification:
-- `k_value` - Coefficient to multiply ATR(14) by, determines distance of upper and lower barriers
-- `n_value` - Length of time barrier from latest complete candle, expressed in candles
-- `train_split`, `val_split` - Determines split ratio of the dataset (test set is whatever is left over)
-- `binary` - Determines the training task for the models: 0 &rarr; flat/directional and 1 &rarr; up/down
-- `corr_pair` - Controls the correlated pair for which to engineer additional features (0 for none)
-- `log_metrics` - Controls whether or not to record test metrics when running `train_model.py`
-- `train_version` - Controls the version name of the model produced when running `train_model.py`
-- `use_version` - Controls the model version used when running `use_model.py`
-Next, manually curate a set of features and hyperparameters, placed in the correctly-versioned subfolder (`train_version`). Copy the format you see in `model_configs/`. Also copy the naming scheme (prefix with "gate" or "dir" depending on which binary task you are training for).\
-You can use `select_features.py` and `tune_params.py` to assist with your curation. See below for details.\
-Now you are ready to train. Run `train_model.py` and the model will be saved to `models/`, sorted by instrument.
 
-### Tuning
-| &nbsp; | `select_features.py` | `tune_params.py` |
-| --- | --- | --- |
-| XGBoost | SHAP importances | Optuna<br/>Feature set follows `train_version` |
-| PatchTST | Permutation importances<br/>Model and feature set follow `use_version` | Optuna<br/>Feature set follows `train_version`<br/>Use --trials flag to control no. of trials (default 50) |
-
-### Deployment
-To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.\
-To deploy it to the site, add an entry in the `web_interface/js/config.js` file, inside the `MODEL_CONFIGS` array. Copy the format of the existing models.\
-*Note: only Git pushes to the `dist/` folder trigger a server-side rebuild and relaunch. Configure this from the Railway dashboard, under "Watch Paths".*\
+## MODELS
+- **XGBoost** uses a gradient-boosted decision tree framework. It builds decision trees sequentially, with each tree improving on the previous one via a gradient descent algorithm. As a traditional machine learning algorithm, it is faster than its modern deep learning counterparts, and performs well on structured, tabular data.
+- **CNN-LSTM** is a hybrid of Convolutional Neural Networks and Long Short-Term Memory networks, which are a variant of Recurrent Neural Networks. The CNN extracts local patterns and reduce noise. The output of the CNN is passed to the LSTM layers, which capture temporal patterns and long-term relationships. This makes them good for time series data like forex markets.
+- **PatchTST** (Patch Time Series Transformer) breaks time series into smaller patches, which serve as input tokens. The transformer backbone uses a series of encoder blocks to understand the data and generate predicted data. The encoder prominently uses self-attention heads, which allow it to understand cross-token context. Finally, the output goes through an output head which produces forecasted values (or classification probabilities).
 <br/>
 
 
@@ -81,3 +48,4 @@ To deploy it to the site, add an entry in the `web_interface/js/config.js` file,
 - Added Gate-PatchTST v1
 ### 1.0
 - Added first model - Gate-XGBoost v1
+<br/>

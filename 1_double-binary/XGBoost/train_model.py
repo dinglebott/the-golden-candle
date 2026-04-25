@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from data_processing import dataparser
 
 # LOAD CONFIG
-with open(Path(__file__).parent.parent.parent / "env.json", "r") as file:
+with open(Path(__file__).parent.parent / "env.json", "r") as file:
     env = json.load(file)
 yearNow = env["year_now"]
 instrument = env["instrument"]

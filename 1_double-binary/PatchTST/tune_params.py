@@ -53,7 +53,7 @@ DEFAULT_PARAMS = {
 
 
 def load_env():
-    with open(Path(__file__).parent.parent.parent / "env.json", "r") as f:
+    with open(Path(__file__).parent.parent / "env.json", "r") as f:
         return json.load(f)
 
 
