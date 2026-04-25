@@ -9,12 +9,13 @@ function formatTimestamp(dateObj) {
     });
 }
 
-// Called once on load — builds a card DOM node for each model in MODEL_CONFIGS
+// ── Gate model cards (always-on) ──────────────────────────────────────────────
+
 function buildModelCards() {
     const container = document.getElementById("model-cards");
     container.innerHTML = "";
 
-    MODEL_CONFIGS.forEach(cfg => {
+    GATE_CONFIGS.forEach(cfg => {
         const probRows = Object.entries(cfg.classes).map(([k, cls]) => `
             <div class="prob-row">
                 <span class="prob-label">${cls.label}</span>
@@ -42,30 +43,8 @@ function buildModelCards() {
     });
 }
 
-function updateCandle(data) {
-    document.getElementById("candle-open").textContent    = formatPrice(data.open);
-    document.getElementById("candle-high").textContent    = formatPrice(data.high);
-    document.getElementById("candle-low").textContent     = formatPrice(data.low);
-    document.getElementById("candle-close").textContent   = formatPrice(data.close);
-    document.getElementById("candle-barrier").textContent = formatPrice(data.barrier);
-
-    // compute start and end hours
-    candleStart = new Date(data.timestamp)
-    candleEnd = new Date(candleStart)
-    candleEnd.setHours(candleStart.getHours() + 1)
-    // format
-    startString = candleStart.toLocaleString("en-SG", {
-        hour: "2-digit", minute: "2-digit", hour12: false
-    })
-    endString = candleEnd.toLocaleString("en-SG", {
-        hour: "2-digit", minute: "2-digit", hour12: false
-    })
-    // write to DOM
-    document.getElementById("candle-timestamp").textContent = `${startString} - ${endString} SGT`;
-}
-
 function updateModels(data) {
-    MODEL_CONFIGS.forEach(cfg => {
+    GATE_CONFIGS.forEach(cfg => {
         const pred    = data[cfg.predKey];
         const probs   = data[cfg.probsKey];
         const version = data[cfg.versionKey];
@@ -91,8 +70,110 @@ function updateModels(data) {
     });
 }
 
+// ── Pattern detector cards (conditional on detection) ────────────────────────
+
+function buildPatternCards() {
+    const container = document.getElementById("model-cards");
+
+    PATTERN_CONFIGS.forEach(cfg => {
+        const probRows = Object.entries(cfg.classes).map(([k, cls]) => `
+            <div class="prob-row">
+                <span class="prob-label">${cls.label}</span>
+                <div class="prob-track">
+                    <div class="prob-fill" id="bar-${cfg.id}-${k}" style="background: ${cls.color}; width: 0%"></div>
+                </div>
+                <span class="prob-value" id="prob-val-${cfg.id}-${k}">--</span>
+            </div>
+        `).join("");
+
+        const card = document.createElement("div");
+        card.className = "card model-card";
+        card.id = `model-card-${cfg.id}`;
+        card.innerHTML = `
+            <div class="card-header">
+                <span class="card-title">${cfg.label}</span>
+                <span class="version-badge" id="version-${cfg.id}">--</span>
+            </div>
+            <div class="model-body">
+                <div class="prediction-badge" id="pred-${cfg.id}">--</div>
+                <div class="prob-bars">${probRows}</div>
+            </div>
+            <div class="pattern-meta" id="meta-${cfg.id}" style="display: none"></div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function updatePatternCard(cfg, data) {
+    const predEl    = document.getElementById(`pred-${cfg.id}`);
+    const versionEl = document.getElementById(`version-${cfg.id}`);
+    const metaEl    = document.getElementById(`meta-${cfg.id}`);
+
+    versionEl.textContent = data.version ? `v${data.version}` : "--";
+
+    if (!data.detected) {
+        predEl.textContent       = "--";
+        predEl.style.color       = "var(--text-muted)";
+        predEl.style.borderColor = "var(--text-muted)";
+        Object.keys(cfg.classes).forEach(k => {
+            const bar = document.getElementById(`bar-${cfg.id}-${k}`);
+            const val = document.getElementById(`prob-val-${cfg.id}-${k}`);
+            if (bar) bar.style.width = "0%";
+            if (val) val.textContent = "--";
+        });
+        metaEl.style.display = "none";
+        return;
+    }
+
+    const matchedClass = Object.values(cfg.classes).find(cls => cls.label === data.pred);
+    const predColor = matchedClass ? matchedClass.color : "var(--text-muted)";
+
+    predEl.textContent       = data.pred;
+    predEl.style.color       = predColor;
+    predEl.style.borderColor = predColor;
+
+    Object.entries(data.probs).forEach(([k, p]) => {
+        const pct = (p * 100).toFixed(1);
+        const bar = document.getElementById(`bar-${cfg.id}-${k}`);
+        const val = document.getElementById(`prob-val-${cfg.id}-${k}`);
+        if (bar) bar.style.width = `${pct}%`;
+        if (val) val.textContent = `${pct}%`;
+    });
+
+    if (cfg.renderMeta && data.meta) {
+        cfg.renderMeta(metaEl, data.meta);
+        metaEl.style.display = "flex";
+    }
+}
+
+function updatePatternCards(results) {
+    PATTERN_CONFIGS.forEach((cfg, i) => updatePatternCard(cfg, results[i]));
+}
+
+// ── Candle card ───────────────────────────────────────────────────────────────
+
+function updateCandle(data) {
+    document.getElementById("candle-open").textContent    = formatPrice(data.open);
+    document.getElementById("candle-high").textContent    = formatPrice(data.high);
+    document.getElementById("candle-low").textContent     = formatPrice(data.low);
+    document.getElementById("candle-close").textContent   = formatPrice(data.close);
+    document.getElementById("candle-barrier").textContent = formatPrice(data.barrier);
+
+    const candleStart = new Date(data.timestamp);
+    const candleEnd   = new Date(candleStart);
+    candleEnd.setHours(candleStart.getHours() + 1);
+    const startString = candleStart.toLocaleString("en-SG", {
+        hour: "2-digit", minute: "2-digit", hour12: false
+    });
+    const endString = candleEnd.toLocaleString("en-SG", {
+        hour: "2-digit", minute: "2-digit", hour12: false
+    });
+    document.getElementById("candle-timestamp").textContent = `${startString} - ${endString} SGT`;
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+
 function setStatus(state) {
-    // state: "loading" | "ok" | "error"
     document.getElementById("status-dot").className = `status-dot ${state}`;
     document.getElementById("status-text").textContent =
         state === "loading" ? "Updating..." :
@@ -100,9 +181,9 @@ function setStatus(state) {
 }
 
 function setLastUpdated(timestamp) {
-    currentTime = new Date(Date.now()).toLocaleString("en-SG", {
+    const currentTime = new Date(Date.now()).toLocaleString("en-SG", {
         day: "2-digit", month: "short",
         hour: "2-digit", minute: "2-digit", hour12: false
-    })
+    });
     document.getElementById("last-updated").textContent = `Last updated: ${currentTime} SGT`;
 }

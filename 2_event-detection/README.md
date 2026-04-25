@@ -45,5 +45,11 @@ Now you are ready to train. Run `train_model.py` and the model will be saved to 
 | XGBoost | SHAP importances | Optuna<br/>Feature set follows `train_version` |
 
 ### Running
-To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.\
+To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.
+
+### Deploying
+Copy the trained model file and its feature list from `XGBoost/models/<instrument>/` into `dist/artifacts/<pattern_name>/`, following the existing naming scheme (`XGBoost_EUR_USD_H1_2026_v<N>.json` and `xgbFeatures_v<N>.json`).\
+In `dist/api/inference.py`, add the pattern name and version to `PATTERN_VERSIONS`.\
+In `dist/api/main.py`, add an entry to `PATTERN_REGISTRY` with the detector module, detector kwargs, active-window size, prediction labels, features to inject from the detected instance, and a `get_meta` function that extracts the human-readable response fields.\
+In `web_interface/js/config.js`, add an entry to `PATTERN_CONFIGS` with the endpoint (`/pattern/<name>`), the class labels and colours for the probability bars, and an optional `renderMeta` function for any pattern-specific metadata to display in the card footer.\
 <br/>

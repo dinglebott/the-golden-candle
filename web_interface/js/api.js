@@ -9,3 +9,9 @@ async function fetchPredictions() {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.json();
 }
+
+async function fetchPattern(endpoint) {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+}

@@ -258,3 +258,29 @@ header h1 {
     color: var(--text);
     text-align: right;
 }
+
+/* ── Pattern metadata row ── */
+
+.pattern-meta {
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+}
+
+.pattern-direction {
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+.pattern-gap {
+    color: var(--text-muted);
+}
+
+.pattern-time {
+    margin-left: auto;
+    color: var(--text-muted);
+}

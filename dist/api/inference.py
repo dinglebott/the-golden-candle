@@ -12,19 +12,28 @@ DIR_ARTIFACTS = Path("artifacts/dir")
 xgbGateVersion = 1
 patchTstGateVersion = 1
 
-# Loaded once at startup
-xgbGateModel = None
-patchTstGateModel = None
-patchTstGateCheckpoint = None
+# Add new pattern names and their model versions here when deploying a new pattern model.
+PATTERN_VERSIONS: dict[str, int] = {
+    "fvg": 1,
+}
+
+_xgbGateModel = None
+_patchTstGateModel = None
+_patchTstGateCheckpoint = None
+_patternModels: dict[str, xgb.XGBClassifier] = {}
+
 
 def loadModels():
-    global xgbGateModel, patchTstGateModel, patchTstGateCheckpoint
+    global _xgbGateModel, _patchTstGateModel, _patchTstGateCheckpoint
 
-    # load xgb gate
-    xgbGateModel = xgb.XGBClassifier()
-    xgbGateModel.load_model(GATE_ARTIFACTS / f"XGBoost_EUR_USD_H1_2026_v{xgbGateVersion}.json")
+    _xgbGateModel = xgb.XGBClassifier()
+    _xgbGateModel.load_model(GATE_ARTIFACTS / f"XGBoost_EUR_USD_H1_2026_v{xgbGateVersion}.json")
 
-    # load patchtst gate
+    for name, version in PATTERN_VERSIONS.items():
+        model = xgb.XGBClassifier()
+        model.load_model(Path(f"artifacts/{name}") / f"XGBoost_EUR_USD_H1_2026_v{version}.json")
+        _patternModels[name] = model
+
     checkpoint = torch.load(
         GATE_ARTIFACTS / f"PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt",
         map_location="cpu",
@@ -33,17 +42,16 @@ def loadModels():
     config = checkpoint["config"]
     core_features = checkpoint["core_features"]
     corr_features = checkpoint["corr_features"]
-    patchTstGateModel = PatchTST(len(core_features), len(corr_features), config)
-    patchTstGateModel.load_state_dict(checkpoint["model_state_dict"])
-    patchTstGateModel.eval()
-    patchTstGateCheckpoint = checkpoint
+    _patchTstGateModel = PatchTST(len(core_features), len(corr_features), config)
+    _patchTstGateModel.load_state_dict(checkpoint["model_state_dict"])
+    _patchTstGateModel.eval()
+    _patchTstGateCheckpoint = checkpoint
 
 
 def predict(xgbGateFeaturesDf: pd.DataFrame) -> dict:
-    # xgb gate prediction
     latestCandle = xgbGateFeaturesDf.iloc[[-1]]
-    xgbGatePred = xgbGateModel.predict(latestCandle)[0]
-    xgbGateProbs = xgbGateModel.predict_proba(latestCandle)[0]
+    xgbGatePred = _xgbGateModel.predict(latestCandle)[0]
+    xgbGateProbs = _xgbGateModel.predict_proba(latestCandle)[0]
 
     xgbGatePredMap = {"0": "FLAT", "1": "DIR"}
     xgbGateProbsDict = {
@@ -57,11 +65,30 @@ def predict(xgbGateFeaturesDf: pd.DataFrame) -> dict:
     }
 
 
+def predictPattern(
+    name: str,
+    df: pd.DataFrame,
+    instance: dict,
+    inject_keys: list[str],
+    features: list[str],
+    pred_labels: dict[int, str],
+) -> dict:
+    row = df.iloc[[instance["index"]]].copy()
+    for key in inject_keys:
+        row[key] = instance[key]
+    probs = _patternModels[name].predict_proba(row[features])[0]
+    pred = pred_labels[1] if probs[1] >= probs[0] else pred_labels[0]
+    return {
+        "pred": pred,
+        "probs": {"0": float(probs[0]), "1": float(probs[1])},
+    }
+
+
 def predictPatchTST(featuresDf: pd.DataFrame) -> dict:
-    config = patchTstGateCheckpoint["config"]
-    core_features = patchTstGateCheckpoint["core_features"]
-    corr_features = patchTstGateCheckpoint["corr_features"]
-    norm = patchTstGateCheckpoint["normalization"]
+    config = _patchTstGateCheckpoint["config"]
+    core_features = _patchTstGateCheckpoint["core_features"]
+    corr_features = _patchTstGateCheckpoint["corr_features"]
+    norm = _patchTstGateCheckpoint["normalization"]
 
     lookback = config["lookback"]
     core_mean = np.array(norm["core_mean"], dtype=np.float32)
@@ -81,7 +108,7 @@ def predictPatchTST(featuresDf: pd.DataFrame) -> dict:
         corr_tensor = torch.zeros(1, lookback, 0, dtype=torch.float32)
 
     with torch.no_grad():
-        logit = patchTstGateModel(core_tensor, corr_tensor)
+        logit = _patchTstGateModel(core_tensor, corr_tensor)
         probDir = torch.sigmoid(logit).item()
 
     probFlat = 1.0 - probDir

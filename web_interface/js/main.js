@@ -1,9 +1,14 @@
 async function refresh() {
     setStatus("loading");
     try {
-        const [candle, predictions] = await Promise.all([fetchCandle(), fetchPredictions()]);
+        const [candle, predictions, ...patternResults] = await Promise.all([
+            fetchCandle(),
+            fetchPredictions(),
+            ...PATTERN_CONFIGS.map(cfg => fetchPattern(cfg.endpoint))
+        ]);
         updateCandle(candle);
         updateModels(predictions);
+        updatePatternCards(patternResults);
         setLastUpdated(candle.timestamp);
         setStatus("ok");
     } catch (err) {
@@ -14,6 +19,7 @@ async function refresh() {
 
 document.addEventListener("DOMContentLoaded", () => {
     buildModelCards();
+    buildPatternCards();
     refresh();
     setInterval(refresh, REFRESH_INTERVAL_MS);
     document.getElementById("refresh-btn").addEventListener("click", refresh);
