@@ -115,7 +115,7 @@ def run_epoch(model, loader, device, pos_weight, optimizer=None, grad_clip=None)
 def suggest_config(trial, base_config, skip_pretrain):
     config = dict(base_config)
 
-    lookback = trial.suggest_categorical("lookback", [48, 96, 144, 192, 240])
+    lookback = trial.suggest_categorical("lookback", [96, 144, 192, 240])
     patch_len = trial.suggest_categorical("patch_len", [4, 8, 16])
     overlapping = trial.suggest_categorical("overlapping_patches", [True, False])
     patch_stride = max(1, patch_len // 2) if overlapping else patch_len

@@ -1,11 +1,11 @@
 ## PROBLEM FRAMING
-With this approach, I divide the problem into 2 binary classifications. Firstly, does the price move in a direction (up/down), or does it remain flat? Secondly, given that it moves in a direction, which direction did it move in? Thus there are 2 types of models being trained here: flat/directional prediction, and up/down prediction. Both output a pair of probabilities, representing the chances of each outcome in their respective binaries.\
+Here I take a 2-step approach. First, use hardcoded numerical criteria to filter out specific candlestick patterns from the dataset. Second, train a model to predict the probability that the setup resolves as expected. Thus the model only outputs a prediction when its specific pattern is detected; otherwise it has no output. It gives sparser but (hopefully) higher quality signals, instead of coin-tossing on every single candle.\
 <br/>
 
 
 ## METHODOLOGY
 ### Labelling
-The target variable is determined by triple-barrier labelling (Marcos López de Prado, 2018). Given parameters *k* and *n*, three barriers are set relative to the close price **C** of the latest candle - upper, lower, and time barrier. The upper and lower barriers are set *k* &times; ATR above and below **C**, and the time barrier is set *n* candles after the latest one. Labels are then computed based on which barrier is hit first.
+The target variable is determined by triple-barrier labelling (Marcos López de Prado, 2018). Given parameters *k* and *n*, three barriers are set relative to some reference point (depending on pattern) - stop loss, take profit, and time barrier. The SL barrier is set *k* &times; ATR below/above the reference point (for bullish/bearish setups respectively). The TP barrier is set according to the expected resolution of the setup. The time barrier is set *n* candles after the pattern emerges. Labels are then computed based on which barrier is hit first.
 
 ### Feature Engineering
 <br/>
@@ -13,6 +13,7 @@ The target variable is determined by triple-barrier labelling (Marcos López de 
 
 ## FILE STRUCTURE
 At the experiment root is an `env.json` for config - see below for details.\
+`patterns/` contains an event detection script for each pattern.\
 Each model architecture has its own folder: XGBoost, CNN-LSTM, PatchTST. Within each folder:\
 `select_features.py` - Feature selection tool\
 `tune_params.py` - Hyperparameter tuning (Optuna)\
@@ -27,11 +28,10 @@ Each model architecture has its own folder: XGBoost, CNN-LSTM, PatchTST. Within 
 ## USAGE
 ### Training
 First, set the correct config variables in `env.json`. Below are the variables that may need some clarification:
-- `k_value` - Coefficient to multiply ATR(14) by, determines distance of upper and lower barriers
-- `n_value` - Length of time barrier from latest complete candle, expressed in candles
+- `k_value` - Coefficient to multiply ATR(14) by, determines stop loss
+- `n_value` - Length of time barrier from pattern emergence, expressed in candles
 - `train_split`, `val_split` - Determines split ratio of the dataset (test set is whatever is left over)
-- `binary` - Determines the training task for the models: 0 &rarr; flat/directional and 1 &rarr; up/down
-- `corr_pair` - Controls the correlated pair for which to engineer additional features (0 for none)
+- `pattern` - Determines the training task for the models
 - `log_metrics` - Controls whether or not to record test metrics when running `train_model.py`
 - `train_version` - Controls the version name of the model produced when running `train_model.py`
 - `use_version` - Controls the model version used when running `use_model.py`
@@ -43,7 +43,6 @@ Now you are ready to train. Run `train_model.py` and the model will be saved to 
 | &nbsp; | `select_features.py` | `tune_params.py` |
 | --- | --- | --- |
 | XGBoost | SHAP importances | Optuna<br/>Feature set follows `train_version` |
-| PatchTST | Permutation importances<br/>Model and feature set follow `use_version` | Optuna<br/>Feature set follows `train_version`<br/>Use --trials flag to control no. of trials (default 50) |
 
 ### Running
 To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.\

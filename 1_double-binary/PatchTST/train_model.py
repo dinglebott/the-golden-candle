@@ -53,6 +53,7 @@ DEFAULT_PARAMS = {
     "finetune_patience": 6,
     "finetune_batch_size": 256,
     "finetune_unfreeze_shared_blocks": 0,
+    "finetune_eta_min": 1e-6,
 }
 
 TASK_CONFIG = {
@@ -252,6 +253,14 @@ def train_stage(model, loaders, device, pos_weight, config, stage_name):
         weight_decay=config[f"{stage_name}_weight_decay"],
     )
 
+    scheduler = None
+    if stage_name == "finetune":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=config["finetune_epochs"],
+            eta_min=config.get("finetune_eta_min", 1e-6),
+        )
+
     best_state = None
     best_epoch = 0
     best_val_loss = math.inf
@@ -276,10 +285,15 @@ def train_stage(model, loaders, device, pos_weight, config, stage_name):
             desc=f"{stage_name.capitalize()} {epoch}/{total_epochs} val",
         )
 
+        if scheduler is not None:
+            scheduler.step()
+
+        lr_str = f" | lr={optimizer.param_groups[0]['lr']:.2e}" if scheduler is not None else ""
         print(
             f"{stage_name.capitalize()} epoch {epoch:02d} | "
             f"train_loss={train_results['loss']:.4f} | "
             f"val_loss={val_results['loss']:.4f}"
+            f"{lr_str}"
         )
 
         if val_results["loss"] < best_val_loss:
