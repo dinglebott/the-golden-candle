@@ -1,6 +1,6 @@
 import sys
 import xgboost as xgb
-from sklearn.metrics import log_loss
+from sklearn.metrics import average_precision_score
 import optuna
 import pandas as pd
 import numpy as np
@@ -62,13 +62,13 @@ y = event_df["target"]
 def objective(trial):
     params = {
         "verbosity": 0,
-        "max_depth": trial.suggest_categorical("max_depth", [3, 4, 5, 6, 7, 8]),
+        "max_depth": trial.suggest_categorical("max_depth", [3, 4, 5, 6, 7]),
         "learning_rate": trial.suggest_float("learning_rate", 0.05, 0.3),
-        "subsample": trial.suggest_float("subsample", 0.5, 0.8),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 0.8),
-        "min_child_weight": trial.suggest_int("min_child_weight", 5, 30),
-        "reg_alpha": trial.suggest_int("reg_alpha", 12, 30),
-        "reg_lambda": trial.suggest_int("reg_lambda", 15, 30),
+        "subsample": trial.suggest_float("subsample", 0.6, 0.8),
+        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 0.8),
+        "min_child_weight": trial.suggest_int("min_child_weight", 5, 30, log=True),
+        "reg_alpha": trial.suggest_int("reg_alpha", 1, 30, log=True),
+        "reg_lambda": trial.suggest_int("reg_lambda", 1, 30, log=True),
         "device": device,
         "tree_method": "hist",
     }
@@ -90,13 +90,13 @@ def objective(trial):
             random_state=42,
         )
         model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
-        fold_scores.append(log_loss(y_val, model.predict_proba(X_val)))
+        fold_scores.append(average_precision_score(y_val, model.predict_proba(X_val)[:, 1]))
 
     return np.mean(fold_scores)
 
 
-study = optuna.create_study(direction="minimize")
-study.optimize(objective, n_trials=100, show_progress_bar=True)
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=60, show_progress_bar=True)
 
 # RECORD RESULTS
 final_params = pd.Series(study.best_params)

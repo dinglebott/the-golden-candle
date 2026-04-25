@@ -1,0 +1,17 @@
+=== v1 | EUR_USD H1 | fvg | XGBoost | 2026-04-25 21:28:10 ===
+Pattern instances: 11834 / 134741 candles (8.8%)
+Train instances: 9467 | Val: 1183 | Test: 1184
+
+Average precision: 0.8362
+Precision (fill): 0.7905
+MCC: 0.3256
+MCC (train set): 0.4220
+
+Confusion matrix:
+        Pred 0  Pred 1  Count
+Real 0     245     150    395
+Real 1     223     566    789
+Count      468     716   1184
+True=no_fill: avg P(no_fill)=0.579 P(fill)=0.421
+True=fill: avg P(no_fill)=0.420 P(fill)=0.580
+

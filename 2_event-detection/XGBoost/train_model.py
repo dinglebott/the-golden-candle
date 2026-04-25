@@ -1,6 +1,6 @@
 import sys
 import xgboost as xgb
-from sklearn.metrics import balanced_accuracy_score, matthews_corrcoef, log_loss, roc_auc_score, confusion_matrix
+from sklearn.metrics import average_precision_score, precision_score, matthews_corrcoef, confusion_matrix
 import pandas as pd
 import json
 from pathlib import Path
@@ -83,24 +83,26 @@ y_pred_train = model.predict(X_train)
 y_prob = model.predict_proba(X_test)
 
 # EVALUATE MODEL
-accuracy = balanced_accuracy_score(y_test, y_pred) * 100
+avgPrecision = average_precision_score(y_test, y_prob[:, 1])
+precision1 = precision_score(y_test, y_pred)
 mcc = matthews_corrcoef(y_test, y_pred)
 train_mcc = matthews_corrcoef(y_train, y_pred_train)
-log_loss_score = log_loss(y_test, y_prob)
-roc_auc = roc_auc_score(y_test, y_prob[:, 1])
 cmatrix = confusion_matrix(y_test, y_pred)
 cmatrix_df = pd.DataFrame(cmatrix, index=["Real 0", "Real 1"], columns=["Pred 0", "Pred 1"])
 cmatrix_df["Count"] = cmatrix_df.sum(axis=1)
 cmatrix_df.loc["Count"] = cmatrix_df.sum(axis=0)
 
+total_candles = len(df)
+instance_pct = len(labelled) / total_candles * 100
+
 lines = []
 lines.append(f"=== v{version} | {instrument} {granularity} | {pattern} | XGBoost | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
+lines.append(f"Pattern instances: {len(labelled)} / {total_candles} candles ({instance_pct:.1f}%)")
 lines.append(f"Train instances: {len(df_train)} | Val: {len(df_val)} | Test: {len(df_test)}")
-lines.append(f"Accuracy (balanced): {accuracy:.2f}%")
+lines.append(f"\nAverage precision: {avgPrecision:.4f}")
+lines.append(f"Precision (fill): {precision1:.4f}")
 lines.append(f"MCC: {mcc:.4f}")
 lines.append(f"MCC (train set): {train_mcc:.4f}")
-lines.append(f"Log loss: {log_loss_score:.4f}")
-lines.append(f"ROC-AUC: {roc_auc:.4f}")
 lines.append(f"\nConfusion matrix:\n{cmatrix_df}")
 for true_class, name in enumerate(["no_fill", "fill"]):
     mask = y_test == true_class

@@ -72,13 +72,14 @@ y_val = df_val["target"]
 
 # TRAIN MODEL
 model = xgb.XGBClassifier(
-    max_depth=5,
-    learning_rate=0.05,
-    subsample=0.7,
-    colsample_bytree=0.7,
-    min_child_weight=30,
-    reg_alpha=20.0,
-    reg_lambda=30.0,
+    max_depth=4,
+    learning_rate=0.074398296,
+    subsample=0.7995419972,
+    colsample_bytree=0.7558848453,
+    min_child_weight=7.0,
+    reg_alpha=29.0,
+    reg_lambda=11.0,
+    scale_pos_weight= 0.5,
     device=device,
     tree_method="hist",
     n_estimators=1000,
