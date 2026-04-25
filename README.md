@@ -32,7 +32,7 @@ This experiment frames the problem as two binary classifications. Firstly, does 
 <br/>
 
 **#2 Event detection**\
-This experiment filters out specific patterns using hardcoded criteria, then predicts the probability of the expected resolution for each instance.
+This experiment filters out specific patterns using hardcoded criteria, then predicts the probability of the expected resolution for each instance.\
 </br>
 
 
