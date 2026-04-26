@@ -71,15 +71,16 @@ X_val = df_val[candidate_features]
 y_val = df_val["target"]
 
 # TRAIN MODEL
+pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
 model = xgb.XGBClassifier(
     max_depth=4,
-    learning_rate=0.074398296,
-    subsample=0.7995419972,
-    colsample_bytree=0.7558848453,
-    min_child_weight=7.0,
-    reg_alpha=29.0,
-    reg_lambda=11.0,
-    scale_pos_weight= 0.5,
+    learning_rate=0.1,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    min_child_weight=10,
+    reg_alpha=1,
+    reg_lambda=1,
+    scale_pos_weight=pos_weight,
     device=device,
     tree_method="hist",
     n_estimators=1000,

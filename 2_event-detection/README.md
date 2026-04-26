@@ -35,6 +35,17 @@ SL - 1.5 &times; ATR beyond the extreme of the 3rd candle\
 
 
 ## USAGE
+### Adding new patterns
+1. Create `patterns/<pattern_name>.py` implementing three things:
+   - `METADATA_FEATURES` — information about the pattern that exist only at the detection candle (e.g. direction). These are injected into the event row and fed directly to the model head, not into the sequence.
+   - `detect(df)` — scans the DataFrame and returns a list of instance dicts. Each dict must include `index`, `time`, and one key per `METADATA_FEATURES` entry, plus any fields needed by `label_instances`.
+   - `label_instances(df, instances, n_candles, k)` — applies triple-barrier labelling and appends `"label": 0 or 1` to each instance dict. Labels must be `1` for "fill" and `0` for "no fill".
+2. Register the pattern in `patterns/registry.py` by adding an entry to `_REGISTRY`.
+3. Set `"pattern": "<pattern_name>"` in `env.json`.
+4. For each model architecture you want to train, create a versioned config folder (`model_configs/v1/`) containing:
+   - `<pattern_name>_features.json` — `{"features": [...]}` listing the features to use. Include any `METADATA_FEATURES` here.
+   - `<pattern_name>_params.json` — hyperparameters in the format used by that architecture (copy from an existing version as a starting point).
+
 ### Training
 First, set the correct config variables in `env.json`. Below are the variables that may need some clarification:
 - `k_value` - Coefficient to multiply ATR(14) by, determines stop loss

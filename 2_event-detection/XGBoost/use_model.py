@@ -45,10 +45,11 @@ else:
         row[feat] = latest[feat]
 
     probabilities = model.predict_proba(row[features])[0] * 100
-    direction_label = "bullish" if latest["direction"] == 1 else "bearish"
 
-    print(f"\nLatest {pattern.upper()} detected at {latest['time']} ({direction_label})")
-    print(f"Gap: {latest['gap_low']:.5f} – {latest['gap_high']:.5f} | gap/ATR: {latest['gap_atr_ratio']:.2f}")
+    print(f"\nLatest {pattern.upper()} detected at {latest['time']}")
+    for feat in pattern_module.METADATA_FEATURES:
+        val = latest[feat]
+        print(f"  {feat}: {val:.4f}" if isinstance(val, float) else f"  {feat}: {val}")
     print(f"\nNO FILL: {probabilities[0]:.2f}%")
     print(f"FILL:    {probabilities[1]:.2f}%")
     print(f"\nFinal prediction: {'FILL' if probabilities[1] > probabilities[0] else 'NO FILL'}")
