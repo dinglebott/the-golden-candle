@@ -6,17 +6,6 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // every 30min
 // predKey, probsKey, versionKey must match keys returned by /predict.
 const GATE_CONFIGS = [
     {
-        id: "xgbGate",
-        label: "XGBoost Gate",
-        versionKey: "xgbGateVersion",
-        predKey: "xgbGatePred",
-        probsKey: "xgbGateProbs",
-        classes: {
-            "0": { label: "FLAT", color: "#94a3b8" },
-            "1": { label: "DIR",  color: "#4ade80" }
-        }
-    },
-    {
         id: "patchTstGate",
         label: "PatchTST Gate",
         versionKey: "patchTstGateVersion",
@@ -42,7 +31,7 @@ const GATE_CONFIGS = [
 const PATTERN_CONFIGS = [
     {
         id: "fvg",
-        label: "XGBoost FVG",
+        label: "CNN-LSTM FVG",
         endpoint: "/pattern/fvg",
         classes: {
             "0": { label: "NO FILL", color: "#f87171" },

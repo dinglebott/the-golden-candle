@@ -1,38 +1,27 @@
 import numpy as np
 import torch
-import xgboost as xgb
 import pandas as pd
 from pathlib import Path
 
 from api.patchtst import PatchTST
+from api.cnn_lstm import CnnLstm
 
 GATE_ARTIFACTS = Path("artifacts/gate")
-DIR_ARTIFACTS = Path("artifacts/dir")
 
-xgbGateVersion = 1
 patchTstGateVersion = 1
 
 # Add new pattern names and their model versions here when deploying a new pattern model.
 PATTERN_VERSIONS: dict[str, int] = {
-    "fvg": 1,
+    "fvg": 2,
 }
 
-_xgbGateModel = None
 _patchTstGateModel = None
 _patchTstGateCheckpoint = None
-_patternModels: dict[str, xgb.XGBClassifier] = {}
+_cnnLstmModels: dict[str, dict] = {}
 
 
 def loadModels():
-    global _xgbGateModel, _patchTstGateModel, _patchTstGateCheckpoint
-
-    _xgbGateModel = xgb.XGBClassifier()
-    _xgbGateModel.load_model(GATE_ARTIFACTS / f"XGBoost_EUR_USD_H1_2026_v{xgbGateVersion}.json")
-
-    for name, version in PATTERN_VERSIONS.items():
-        model = xgb.XGBClassifier()
-        model.load_model(Path(f"artifacts/{name}") / f"XGBoost_EUR_USD_H1_2026_v{version}.json")
-        _patternModels[name] = model
+    global _patchTstGateModel, _patchTstGateCheckpoint
 
     checkpoint = torch.load(
         GATE_ARTIFACTS / f"PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt",
@@ -47,40 +36,61 @@ def loadModels():
     _patchTstGateModel.eval()
     _patchTstGateCheckpoint = checkpoint
 
+    for name, version in PATTERN_VERSIONS.items():
+        ckpt = torch.load(
+            Path(f"artifacts/{name}") / f"CNN-LSTM_EUR_USD_H1_2026_v{version}.pt",
+            map_location="cpu",
+            weights_only=False,
+        )
+        cfg = ckpt["config"]
+        seq_features = ckpt["seq_features"]
+        meta_features = ckpt["meta_features"]
+        model = CnnLstm(
+            n_seq_features=len(seq_features),
+            n_meta_features=len(meta_features),
+            conv_filters=cfg["conv_filters"],
+            conv_kernel_size=cfg["conv_kernel_size"],
+            lstm_hidden=cfg["lstm_hidden"],
+            lstm_layers=cfg["lstm_layers"],
+            dropout=cfg["dropout"],
+        )
+        model.load_state_dict(ckpt["model_state_dict"])
+        model.eval()
+        ckpt["_model"] = model
+        _cnnLstmModels[name] = ckpt
 
-def predict(xgbGateFeaturesDf: pd.DataFrame) -> dict:
-    latestCandle = xgbGateFeaturesDf.iloc[[-1]]
-    xgbGatePred = _xgbGateModel.predict(latestCandle)[0]
-    xgbGateProbs = _xgbGateModel.predict_proba(latestCandle)[0]
 
-    xgbGatePredMap = {"0": "FLAT", "1": "DIR"}
-    xgbGateProbsDict = {
-        "0": xgbGateProbs[0],
-        "1": xgbGateProbs[1]
-    }
+def predictCnnLstm(name: str, df: pd.DataFrame, instance: dict, pred_labels: dict[int, str]) -> dict:
+    ckpt = _cnnLstmModels[name]
+    seq_features = ckpt["seq_features"]
+    meta_features = ckpt["meta_features"]
+    norm = ckpt["normalization"]
+    seq_len = ckpt["config"]["seq_len"]
+    model = ckpt["_model"]
 
-    return {
-        "xgbGatePred": xgbGatePredMap[str(xgbGatePred)],
-        "xgbGateProbs": xgbGateProbsDict
-    }
+    idx = instance["index"]
+    seq = df.iloc[idx - seq_len + 1 : idx + 1][seq_features].values.astype(np.float32)
+    seq_mean = np.array(norm["seq_mean"], dtype=np.float32).squeeze()
+    seq_std  = np.array(norm["seq_std"],  dtype=np.float32).squeeze()
+    seq = (seq - seq_mean) / seq_std
 
+    meta = np.array([instance[f] for f in meta_features], dtype=np.float32)
+    meta_mean = np.array(norm["meta_mean"], dtype=np.float32).squeeze()
+    meta_std  = np.array(norm["meta_std"],  dtype=np.float32).squeeze()
+    meta = (meta - meta_mean) / meta_std
 
-def predictPattern(
-    name: str,
-    df: pd.DataFrame,
-    instance: dict,
-    inject_keys: list[str],
-    features: list[str],
-    pred_labels: dict[int, str],
-) -> dict:
-    row = df.iloc[[instance["index"]]].copy()
-    for key in inject_keys:
-        row[key] = instance[key]
-    probs = _patternModels[name].predict_proba(row[features])[0]
-    pred = pred_labels[1] if probs[1] >= probs[0] else pred_labels[0]
+    x_seq  = torch.tensor(seq).unsqueeze(0)
+    x_meta = torch.tensor(meta).unsqueeze(0)
+
+    with torch.no_grad():
+        logit = model(x_seq, x_meta)
+        prob_pos = torch.sigmoid(logit).item()
+
+    prob_neg = 1.0 - prob_pos
+    pred = pred_labels[1] if prob_pos >= 0.5 else pred_labels[0]
     return {
         "pred": pred,
-        "probs": {"0": float(probs[0]), "1": float(probs[1])},
+        "probs": {"0": prob_neg, "1": prob_pos},
     }
 
 

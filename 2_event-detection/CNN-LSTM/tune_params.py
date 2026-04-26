@@ -77,12 +77,12 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 
 def objective(trial):
-    seq_len = trial.suggest_categorical("seq_len", [10, 20, 30])
+    seq_len = trial.suggest_categorical("seq_len", [20, 30, 40, 50])
     conv_filters = trial.suggest_categorical("conv_filters", [32, 64, 128])
-    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5])
+    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7])
     lstm_hidden = trial.suggest_categorical("lstm_hidden", [64, 128, 256])
     lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
-    dropout = trial.suggest_float("dropout", 0.1, 0.5)
+    dropout = trial.suggest_float("dropout", 0.1, 0.6)
     lr = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
     batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
 

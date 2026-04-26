@@ -15,6 +15,13 @@ from data_processing import dataparser
 from patterns import registry
 from classes import EventDataset, CnnLstm
 
+SEED = 42
+torch.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)
+np.random.seed(SEED)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 # LOAD CONFIGS
 with open(Path(__file__).parent.parent / "env.json", "r") as f:
     env = json.load(f)
@@ -116,13 +123,12 @@ pos_count = y_train.sum()
 neg_count = len(y_train) - pos_count
 pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32).to(device)
 criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=params["learning_rate"])
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
-
 batch_size = params["batch_size"]
 epochs = params["epochs"]
 patience = params["patience"]
+
+optimizer = torch.optim.Adam(model.parameters(), lr=params["learning_rate"], weight_decay=params.get("weight_decay", 0.0))
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
 train_loader = DataLoader(EventDataset(X_train_seq, X_train_meta, y_train), batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(EventDataset(X_val_seq, X_val_meta, y_val), batch_size=batch_size)
@@ -142,14 +148,20 @@ for epoch in range(1, epochs + 1):
         optimizer.step()
 
     model.eval()
+    train_logits_list, train_labels_list = [], []
     val_logits_list, val_labels_list = [], []
     with torch.no_grad():
+        for x_seq, x_meta, y_batch in train_loader:
+            train_logits_list.append(model(x_seq.to(device), x_meta.to(device)).cpu())
+            train_labels_list.append(y_batch)
         for x_seq, x_meta, y_batch in val_loader:
             val_logits_list.append(model(x_seq.to(device), x_meta.to(device)).cpu())
             val_labels_list.append(y_batch)
+    train_probs = torch.sigmoid(torch.cat(train_logits_list)).numpy()
+    train_ap = average_precision_score(torch.cat(train_labels_list).numpy(), train_probs)
     val_probs = torch.sigmoid(torch.cat(val_logits_list)).numpy()
     val_ap = average_precision_score(torch.cat(val_labels_list).numpy(), val_probs)
-    scheduler.step(-val_ap)
+    scheduler.step()
 
     if val_ap > best_val_ap:
         best_val_ap = val_ap
@@ -161,8 +173,7 @@ for epoch in range(1, epochs + 1):
             print(f"Early stopping at epoch {epoch}")
             break
 
-    if epoch % 10 == 0:
-        print(f"Epoch {epoch:3d} | val AP: {val_ap:.4f} | best: {best_val_ap:.4f}")
+    print(f"Epoch {epoch:3d} | train AP: {train_ap:.4f} | val AP: {val_ap:.4f} | best: {best_val_ap:.4f}")
 
 model.load_state_dict(best_state)
 

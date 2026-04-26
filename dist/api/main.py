@@ -3,26 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
-import json
 
-from api.inference import loadModels, predict, predictPatchTST, predictPattern, PATTERN_VERSIONS
+from api.inference import loadModels, predictPatchTST, predictCnnLstm, PATTERN_VERSIONS, patchTstGateVersion
 from api.models import PredictionResponse, CandleInfo, PatternResponse
 from api.data_processing import getData, parseData, parseLiveCorrelated
 import api.fair_value_gap as fvg_detector
 
 logger = logging.getLogger(__name__)
 GATE_ARTIFACTS = Path("artifacts/gate")
-DIR_ARTIFACTS = Path("artifacts/dir")
 K_VALUE = 1.5
 N_VALUE = 6
 MIN_GAP_ATR_RATIO = 0.3
 
-xgbGateVersion = 1
-patchTstGateVersion = 1
-
 # Registry for pattern endpoints. To add a new pattern:
 #   1. Implement a detector module with detect(df, **kwargs) -> list[dict]
-#      Each instance dict must have "index" (row in df) and all keys listed in inject_features.
+#      Each instance dict must have "index" (row in df) and all keys listed in get_meta.
 #   2. Add an entry here with the config keys shown below.
 #   3. Add the version to PATTERN_VERSIONS in inference.py.
 #   4. Add the pattern to PATTERN_CONFIGS in web_interface/js/config.js.
@@ -32,13 +27,16 @@ PATTERN_REGISTRY: dict[str, dict] = {
         "detector_kwargs": {"min_gap_atr_ratio": MIN_GAP_ATR_RATIO},
         "n_active": N_VALUE,                         # trailing bars that count as active signal
         "pred_labels": {0: "NO_FILL", 1: "FILL"},   # maps class index to prediction string
-        "inject_features": ["gap_atr_ratio", "direction"],  # instance keys to inject as model features
         "get_meta": lambda inst: {                   # extracts human-readable metadata for the response
             "direction": "bullish" if inst["direction"] == 1 else "bearish",
             "gap_low": inst["gap_low"],
             "gap_high": inst["gap_high"],
             "gap_atr_ratio": inst["gap_atr_ratio"],
             "detection_time": str(inst["time"]),
+            "tp": inst["gap_low"] + 0.5 * inst["gap_size"],
+            "sl": inst["candle_high"] + K_VALUE * (inst["gap_size"] / inst["gap_atr_ratio"])
+                  if inst["direction"] == 1
+                  else inst["candle_low"] - K_VALUE * (inst["gap_size"] / inst["gap_atr_ratio"]),
         },
     },
 }
@@ -46,21 +44,18 @@ PATTERN_REGISTRY: dict[str, dict] = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Runs once at startup — load models into memory
     logger.info("Loading models...")
     loadModels()
     logger.info("Models loaded.")
     yield
-    # Runs at shutdown (cleanup if needed)
 
 
 app = FastAPI(
     title="Golden Candle API",
-    version="1.2",
+    version="1.3",
     lifespan=lifespan
 )
 
-# Allow frontend to call this API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://dinglebott.github.io"],
@@ -68,18 +63,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# guard against silent failure
-assert (GATE_ARTIFACTS / f"XGBoost_EUR_USD_H1_2026_v{xgbGateVersion}.json").exists(), \
-    f"XGB gate model not found for version {xgbGateVersion}"
-assert (GATE_ARTIFACTS / f"xgbFeatures_v{xgbGateVersion}.json").exists(), \
-    f"XGB feature list not found for version {xgbGateVersion}"
 assert (GATE_ARTIFACTS / f"PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt").exists(), \
     f"PatchTST gate model not found for version {patchTstGateVersion}"
 for _name, _version in PATTERN_VERSIONS.items():
-    assert (Path(f"artifacts/{_name}") / f"XGBoost_EUR_USD_H1_2026_v{_version}.json").exists(), \
-        f"XGB {_name} model not found for version {_version}"
-    assert (Path(f"artifacts/{_name}") / f"xgbFeatures_v{_version}.json").exists(), \
-        f"XGB {_name} feature list not found for version {_version}"
+    assert (Path(f"artifacts/{_name}") / f"CNN-LSTM_EUR_USD_H1_2026_v{_version}.pt").exists(), \
+        f"CNN-LSTM {_name} model not found for version {_version}"
 
 
 @app.get("/health")
@@ -89,22 +77,15 @@ def health():
 
 @app.get("/predict", response_model=PredictionResponse)
 def getPrediction():
-    with open(GATE_ARTIFACTS / f"xgbFeatures_v{xgbGateVersion}.json", "r") as file:
-        xgbGateFeatureList = json.load(file)["features"]
-
     try:
         jsonData, timestamp = getData("EUR_USD", "H1", 500)
         jsonCorr, _ = getData("GBP_USD", "H1", 500)
         featuresDf = parseData(jsonData)
         df_corr = parseLiveCorrelated(jsonData, jsonCorr, "GBP_USD")
         featuresDf = featuresDf.merge(df_corr, on="time", how="inner")
-        xgbGateFeaturesDf = featuresDf[xgbGateFeatureList]
 
-        xgbResult = predict(xgbGateFeaturesDf)
         patchTstResult = predictPatchTST(featuresDf)
         return PredictionResponse(
-            **xgbResult,
-            xgbGateVersion=f"{xgbGateVersion}",
             **patchTstResult,
             patchTstGateVersion=f"{patchTstGateVersion}",
             timestamp=timestamp,
@@ -121,17 +102,13 @@ def getPatternPrediction(name: str):
 
     cfg = PATTERN_REGISTRY[name]
     version = PATTERN_VERSIONS[name]
-    feature_path = Path(f"artifacts/{name}") / f"xgbFeatures_v{version}.json"
-
-    with open(feature_path, "r") as file:
-        featureList = json.load(file)["features"]
 
     try:
         jsonData, timestamp = getData("EUR_USD", "H1", 500)
         df = parseData(jsonData)
 
         instances = cfg["detector"].detect(df, **cfg["detector_kwargs"])
-        active = [inst for inst in instances if inst["index"] >= len(df) - cfg["n_active"]] # avoid stale signals
+        active = [inst for inst in instances if inst["index"] >= len(df) - cfg["n_active"]]
 
         if not active:
             return PatternResponse(
@@ -144,7 +121,7 @@ def getPatternPrediction(name: str):
             )
 
         latest = active[-1]
-        result = predictPattern(name, df, latest, cfg["inject_features"], featureList, cfg["pred_labels"])
+        result = predictCnnLstm(name, df, latest, cfg["pred_labels"])
         return PatternResponse(
             detected=True,
             pred=result["pred"],
@@ -162,7 +139,7 @@ def getPatternPrediction(name: str):
 def getCandleInfo():
     try:
         jsonData, timestamp = getData("EUR_USD", "H1", 500)
-        df = parseData(jsonData) # incomplete candle dropped here
+        df = parseData(jsonData)
         lastCompleteCandle = df.iloc[-1]
         return CandleInfo(
             open=lastCompleteCandle["open"].item(),

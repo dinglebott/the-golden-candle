@@ -98,6 +98,16 @@ function buildPatternCards() {
                 <div class="prediction-badge" id="pred-${cfg.id}">--</div>
                 <div class="prob-bars">${probRows}</div>
             </div>
+            <div class="tp-sl-rows">
+                <div class="tp-sl-item">
+                    <span class="tp-sl-label">TP</span>
+                    <span class="tp-sl-value tp" id="tp-${cfg.id}">--</span>
+                </div>
+                <div class="tp-sl-item">
+                    <span class="tp-sl-label">SL</span>
+                    <span class="tp-sl-value sl" id="sl-${cfg.id}">--</span>
+                </div>
+            </div>
             <div class="pattern-meta" id="meta-${cfg.id}" style="display: none"></div>
         `;
         container.appendChild(card);
@@ -111,6 +121,9 @@ function updatePatternCard(cfg, data) {
 
     versionEl.textContent = data.version ? `v${data.version}` : "--";
 
+    const tpEl = document.getElementById(`tp-${cfg.id}`);
+    const slEl = document.getElementById(`sl-${cfg.id}`);
+
     if (!data.detected) {
         predEl.textContent       = "--";
         predEl.style.color       = "var(--text-muted)";
@@ -121,6 +134,8 @@ function updatePatternCard(cfg, data) {
             if (bar) bar.style.width = "0%";
             if (val) val.textContent = "--";
         });
+        if (tpEl) tpEl.textContent = "--";
+        if (slEl) slEl.textContent = "--";
         metaEl.style.display = "none";
         return;
     }
@@ -139,6 +154,9 @@ function updatePatternCard(cfg, data) {
         if (bar) bar.style.width = `${pct}%`;
         if (val) val.textContent = `${pct}%`;
     });
+
+    if (tpEl && data.meta?.tp != null) tpEl.textContent = formatPrice(data.meta.tp);
+    if (slEl && data.meta?.sl != null) slEl.textContent = formatPrice(data.meta.sl);
 
     if (cfg.renderMeta && data.meta) {
         cfg.renderMeta(metaEl, data.meta);

@@ -44,6 +44,9 @@ This experiment filters out specific patterns using hardcoded criteria, then pre
 
 
 ## DEPLOYMENT CHANGELOG
+### 1.3
+- Added FVG-CNN-LSTM v2
+- Removed old XGBoost models
 ### 1.2
 - Added first pattern detection - FVG-XGBoost v1
 ### 1.1
