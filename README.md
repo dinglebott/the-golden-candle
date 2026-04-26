@@ -44,6 +44,8 @@ This experiment filters out specific patterns using hardcoded criteria, then pre
 
 
 ## DEPLOYMENT CHANGELOG
+### 1.2
+- Added first pattern detection - FVG-XGBoost v1
 ### 1.1
 - Added Gate-PatchTST v1
 ### 1.0
