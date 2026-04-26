@@ -29,8 +29,7 @@ def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:
                     "gap_high": bull_gap_high,
                     "gap_size": gap_size,
                     "gap_atr_ratio": gap_size / atr,
-                    # price must reach here (from above) to enter the gap
-                    "fill_target": bull_gap_high,
+                    "fill_target": (bull_gap_low + bull_gap_high) / 2,
                 })
 
         # Bearish FVG: gap between candle[i] high and candle[i-2] low
@@ -47,8 +46,7 @@ def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:
                     "gap_high": bear_gap_high,
                     "gap_size": gap_size,
                     "gap_atr_ratio": gap_size / atr,
-                    # price must reach here (from below) to enter the gap
-                    "fill_target": bear_gap_low,
+                    "fill_target": (bear_gap_low + bear_gap_high) / 2,
                 })
 
     return instances
@@ -74,8 +72,8 @@ def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int, k: 
         for j in range(i + 1, min(i + 1 + n_candles, n_rows)):
             stopped = highs[j] >= stop_level if inst["direction"] == 1 else lows[j] <= stop_level
             filled = lows[j] <= inst["fill_target"] if inst["direction"] == 1 else highs[j] >= inst["fill_target"]
-            if stopped: # same candle hit both = stopped out
-                break
+            if stopped:
+                break # same candle hit both barriers = stopped out
             if filled:
                 label = 1
                 break

@@ -29,7 +29,7 @@ Each model architecture has its own folder: XGBoost, CNN-LSTM, PatchTST. Within 
 ## PATTERNS
 **Fair value gap (FVG)**\
 3-candle pattern, defined as the gap between the extremes (highs/lows) of the 1st and 3rd candles. Indicates a large buying/selling impulse which causes a region of unfilled orders. The expected resolution is that the market returns to touch the gap before continuing its trend.\
-TP - Nearer end of the gap (upper end for bullish FVG, lower end for bearish FVG)\
+TP - 50% mark of the gap\
 SL - 1.5 &times; ATR beyond the extreme of the 3rd candle\
 <br/>
 
@@ -62,7 +62,8 @@ Now you are ready to train. Run `train_model.py` and the model will be saved to 
 ### Tuning
 | &nbsp; | `select_features.py` | `tune_params.py` |
 | --- | --- | --- |
-| XGBoost | SHAP importances | Optuna<br/>Feature set follows `train_version` |
+| XGBoost | SHAP importances<br/>Params follow `train_version` | Optuna<br/>Feature set follows `train_version` |
+| CNN-LSTM | SHAP importances<br/>Params follow `train_version` | Optuna<br/>Feature set follows `train_version` |
 
 ### Running
 To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.

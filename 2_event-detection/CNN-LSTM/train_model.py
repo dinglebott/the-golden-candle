@@ -109,6 +109,9 @@ model = CnnLstm(
     dropout=params["dropout"],
 ).to(device)
 
+n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Model parameters: {n_params:,}")
+
 pos_count = y_train.sum()
 neg_count = len(y_train) - pos_count
 pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32).to(device)

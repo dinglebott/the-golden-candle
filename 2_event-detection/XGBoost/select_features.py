@@ -23,9 +23,32 @@ train_split = env["train_split"]
 val_split = env["val_split"]
 device = env["device"]
 pattern = env["pattern"]
+version = env["xgb"]["train_version"]
 
 # LOAD EVENT DETECTOR
 pattern_module = registry.load(pattern)
+
+# LOAD MODEL PARAMS — use versioned configs if available, else fall back to defaults
+_params_path = Path(__file__).parent / f"model_configs/v{version}/{pattern}_params.json"
+if _params_path.exists():
+    with open(_params_path) as f:
+        _p = json.load(f)
+    _model_params = {
+        "max_depth":        int(_p["max_depth"]),
+        "learning_rate":    _p["learning_rate"],
+        "subsample":        _p["subsample"],
+        "colsample_bytree": _p["colsample_bytree"],
+        "min_child_weight": int(_p["min_child_weight"]),
+        "reg_alpha":        _p["reg_alpha"],
+        "reg_lambda":       _p["reg_lambda"],
+    }
+    print(f"Loaded params from model_configs/v{version}/{pattern}_params.json")
+else:
+    _model_params = {
+        "max_depth": 4, "learning_rate": 0.1, "subsample": 0.8,
+        "colsample_bytree": 0.8, "min_child_weight": 10, "reg_alpha": 1, "reg_lambda": 1,
+    }
+    print(f"No model_configs found for v{version} — using default params")
 
 candidate_features = [
     "open_return", "high_return", "low_return", "close_return", "vol_return",
@@ -73,13 +96,7 @@ y_val = df_val["target"]
 # TRAIN MODEL
 pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
 model = xgb.XGBClassifier(
-    max_depth=4,
-    learning_rate=0.1,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    min_child_weight=10,
-    reg_alpha=1,
-    reg_lambda=1,
+    **_model_params,
     scale_pos_weight=pos_weight,
     device=device,
     tree_method="hist",
