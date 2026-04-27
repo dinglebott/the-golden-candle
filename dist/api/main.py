@@ -11,7 +11,6 @@ import api.fair_value_gap as fvg_detector
 
 logger = logging.getLogger(__name__)
 GATE_ARTIFACTS = Path("artifacts/gate")
-K_VALUE = 1.5
 N_VALUE = 6
 MIN_GAP_ATR_RATIO = 0.3
 
@@ -34,9 +33,9 @@ PATTERN_REGISTRY: dict[str, dict] = {
             "gap_atr_ratio": inst["gap_atr_ratio"],
             "detection_time": str(inst["time"]),
             "tp": inst["gap_low"] + 0.5 * inst["gap_size"],
-            "sl": inst["candle_high"] + K_VALUE * (inst["gap_size"] / inst["gap_atr_ratio"])
+            "sl": inst["candle_high"] + 1.5 * (inst["gap_size"] / inst["gap_atr_ratio"])
                   if inst["direction"] == 1
-                  else inst["candle_low"] - K_VALUE * (inst["gap_size"] / inst["gap_atr_ratio"]),
+                  else inst["candle_low"] - 1.5 * (inst["gap_size"] / inst["gap_atr_ratio"]),
         },
     },
 }
@@ -146,7 +145,7 @@ def getCandleInfo():
             high=lastCompleteCandle["high"].item(),
             low=lastCompleteCandle["low"].item(),
             close=lastCompleteCandle["close"].item(),
-            barrier=lastCompleteCandle["raw_atr"].item() * K_VALUE,
+            barrier=lastCompleteCandle["raw_atr"].item() * 1.5,
             timestamp=timestamp
         )
     except Exception as e:

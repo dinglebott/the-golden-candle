@@ -15,6 +15,9 @@ A "fill" is only labelled if price hits the TP barrier before any other barrier.
 ## FILE STRUCTURE
 At the experiment root is an `env.json` for config - see below for details.\
 `patterns/` contains an event detection script for each pattern - see below for the list of patterns implemented so far.\
+`registry.py` is an index of all patterns, and it imports the relevant pattern detection file automatically based on `env.json`.\y
+<br/>
+
 Each model architecture has its own folder: XGBoost, CNN-LSTM, PatchTST. Within each folder:\
 `select_features.py` - Feature selection tool\
 `tune_params.py` - Hyperparameter tuning (Optuna)\

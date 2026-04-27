@@ -65,6 +65,29 @@ Two sequential binary models: gate (flat vs directional) then direction (up vs d
 - `freeze_for_finetune()` freezes shared blocks and optionally unfreezes the last N during finetune
 - Checkpoints (`.pt`) bundle everything needed for inference: `config`, `core_features`, `corr_features`, `normalization` (mean/std for core and corr separately), `model_state_dict`
 
+### Experiment 2: event-detection (`2_event-detection/`)
+Pattern-gated approach: a hardcoded detector first filters candles matching a specific pattern, then a model predicts whether the pattern resolves as expected. The model only outputs a signal when its pattern fires, giving sparser but higher-quality signals.
+
+**Labelling:** Triple-barrier labelling anchored to the pattern. TP is the pattern's expected resolution (e.g. 50% of the FVG). SL is `k × ATR` beyond the 3rd candle's extreme. Time barrier is `n` candles after detection. Label `1` = fill (TP hit first), `0` = no fill.
+
+**Patterns** (`patterns/`):
+- `fair_value_gap.py` — 3-candle pattern; gap between candle[i-2] high and candle[i] low (bullish) or vice versa (bearish). Metadata features: `gap_atr_ratio`, `direction`.
+- `registry.py` — maps pattern name strings to their detector modules.
+
+**CNN-LSTM model** (`CNN-LSTM/classes.py`):
+- Two-input architecture: a sequence input (OHLCV + engineered features over a lookback window) and a metadata input (pattern-specific scalar features injected at detection time).
+- Conv1D (2 layers) extracts local patterns → LSTM reads temporal structure → final hidden state concatenated with metadata → MLP head outputs a single logit.
+- Checkpoints (`.pt`) store `model_state_dict`, `config`, `seq_features`, `meta_features`, and normalization stats.
+
+**Key `env.json` fields:**
+- `pattern` — name of the active pattern (e.g. `"fvg"`); controls which detector and labeller are used
+- `k_value` / `n_value` — SL multiplier and time-barrier length
+- `train_version` / `use_version` — nested under `"xgb"` and `"cnn_lstm"` keys
+
+**Adding a new pattern:** implement `METADATA_FEATURES`, `detect(df)`, and `label_instances(df, instances, n_candles, k)` in `patterns/<name>.py`, register it in `registry.py`, set `"pattern"` in `env.json`, and add versioned feature/param configs under each model architecture's `model_configs/`.
+
+**Deploying:** copy the trained model and feature list into `dist/artifacts/<pattern_name>/`, add the pattern to `PATTERN_VERSIONS` in `dist/api/inference.py`, add an entry to `PATTERN_REGISTRY` in `dist/api/main.py`, and add a `PATTERN_CONFIGS` entry in `web_interface/js/config.js`.
+
 ### Deployment (`dist/`)
 FastAPI server exposing `/predict` and `/candle`. Models are loaded once at startup via `lifespan`. Artifact paths are hardcoded in `main.py` and `inference.py` — update the version integers there when deploying a new model. Trained models must be manually copied from `1_double-binary/*/models/` into `dist/artifacts/gate/` or `dist/artifacts/dir/`.
 

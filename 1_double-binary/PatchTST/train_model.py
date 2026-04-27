@@ -339,6 +339,8 @@ def evaluate_target_model(model, loaders, device, pos_weight):
 def main():
     torch.manual_seed(42)
     np.random.seed(42)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     env = load_env()
     patchtst_env = env.get("patchtst", {})

@@ -20,11 +20,6 @@
         "vol_ratio",
         "vol_momentum",
         "adx",
-        "di_diff",
-        "close_lag1",
-        "close_lag4",
-        "vol_lag2",
-        "vol_lag3",
-        "vol_lag4"
+        "di_diff"
     ]
 }

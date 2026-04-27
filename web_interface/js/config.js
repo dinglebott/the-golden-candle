@@ -34,8 +34,8 @@ const PATTERN_CONFIGS = [
         label: "CNN-LSTM FVG",
         endpoint: "/pattern/fvg",
         classes: {
-            "0": { label: "NO FILL", color: "#f87171" },
-            "1": { label: "FILL",    color: "#4ade80" },
+            "0": { label: "NO FILL", badge: "X",    color: "#f87171" },
+            "1": { label: "FILL",    badge: "FILL",  color: "#4ade80" },
         },
         renderMeta(metaEl, meta) {
             const dirColor = meta.direction === "bullish" ? "#4ade80" : "#f87171";

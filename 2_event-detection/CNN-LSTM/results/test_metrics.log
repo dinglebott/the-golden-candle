@@ -1,4 +1,5 @@
 === v1 | EUR_USD H1 | fvg | CNN-LSTM | 2026-04-26 09:32:05 ===
+NOTE: fill target was changed to halfway mark of the gap. This model uses the old target (closer edge of gap) and is deprecated.
 Pattern instances: 11834 / 134741 candles (8.8%)
 Train instances: 9466 | Val: 1183 | Test: 1184
 
