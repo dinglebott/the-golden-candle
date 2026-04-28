@@ -12,7 +12,6 @@ import api.fair_value_gap as fvg_detector
 logger = logging.getLogger(__name__)
 GATE_ARTIFACTS = Path("artifacts/gate")
 N_VALUE = 6
-MIN_GAP_ATR_RATIO = 0.3
 
 # Registry for pattern endpoints. To add a new pattern:
 #   1. Implement a detector module with detect(df, **kwargs) -> list[dict]
@@ -23,7 +22,7 @@ MIN_GAP_ATR_RATIO = 0.3
 PATTERN_REGISTRY: dict[str, dict] = {
     "fvg": {
         "detector": fvg_detector,
-        "detector_kwargs": {"min_gap_atr_ratio": MIN_GAP_ATR_RATIO},
+        "detector_kwargs": {"min_gap_atr_ratio": 0.3},
         "n_active": N_VALUE,                         # trailing bars that count as active signal
         "pred_labels": {0: "NO FILL", 1: "FILL"},   # maps class index to prediction string
         "get_meta": lambda inst: {                   # extracts human-readable metadata for the response
