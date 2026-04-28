@@ -34,7 +34,7 @@ const PATTERN_CONFIGS = [
         label: "CNN-LSTM FVG",
         endpoint: "/pattern/fvg",
         classes: {
-            "0": { label: "NO_FILL", badge: "X", color: "#f87171" },
+            "0": { label: "NO FILL", badge: "X", color: "#f87171" },
             "1": { label: "FILL", badge: "FILL", color: "#4ade80" },
         },
         renderMeta(metaEl, meta) {
