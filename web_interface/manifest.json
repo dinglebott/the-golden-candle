@@ -11,7 +11,8 @@
   "lang": "en",
   "icons": [
     {
-      "src": "logo.png"
+      "src": "assets/maskable.png",
+      "purpose": "any maskable"
     }
   ]
 }
