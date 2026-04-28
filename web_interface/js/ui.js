@@ -143,8 +143,8 @@ function updatePatternCard(cfg, data) {
     const matchedClass = Object.values(cfg.classes).find(cls => cls.label === data.pred);
     const predColor = matchedClass ? matchedClass.color : "var(--text-muted)";
 
-    predEl.textContent       = matchedClass?.badge;
-    predEl.style.color       = predColor;
+    predEl.textContent = matchedClass?.badge;
+    predEl.style.color = predColor;
     predEl.style.borderColor = predColor;
 
     Object.entries(data.probs).forEach(([k, p]) => {
