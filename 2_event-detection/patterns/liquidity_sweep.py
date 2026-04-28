@@ -4,7 +4,7 @@ import numpy as np
 METADATA_FEATURES = ["sweep_atr_ratio", "direction"]
 
 
-def detect(df: pd.DataFrame, lookback: int = 20, min_sweep_atr_ratio: float = 0.1) -> list[dict]:
+def detect(df: pd.DataFrame, lookback: int = 50, min_sweep_atr_ratio: float = 0.3) -> list[dict]:
     highs = df["high"].values
     lows = df["low"].values
     closes = df["close"].values

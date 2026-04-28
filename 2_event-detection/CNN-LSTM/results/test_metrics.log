@@ -33,3 +33,20 @@ Count      540     644   1184
 True=no_fill: avg P(no_fill)=0.580 P(fill)=0.420
 True=fill: avg P(no_fill)=0.430 P(fill)=0.570
 
+=== v1 | EUR_USD H1 | order_block | CNN-LSTM | 2026-04-28 14:51:36 ===
+Pattern instances: 7925 / 134741 candles (5.9%)
+Train instances: 6340 | Val: 792 | Test: 793
+
+Average precision: 0.5865
+Precision (fill): 0.5855
+MCC: 0.2725
+MCC (train set): 0.1878
+
+Confusion matrix:
+        Pred 0  Pred 1  Count
+Real 0     279     160    439
+Real 1     128     226    354
+Count      407     386    793
+True=no_fill: avg P(no_fill)=0.546 P(fill)=0.454
+True=fill: avg P(no_fill)=0.489 P(fill)=0.511
+

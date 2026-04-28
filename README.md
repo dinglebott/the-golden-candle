@@ -44,13 +44,15 @@ This experiment filters out specific patterns using hardcoded criteria, then pre
 
 
 ## DEPLOYMENT CHANGELOG
+### 1.4
+- Added order block CNN-LSTM v1
 ### 1.3
-- Added FVG-CNN-LSTM v2
+- Added FVG CNN-LSTM v2
 - Removed old XGBoost models
 ### 1.2
-- Added first pattern detection - FVG-XGBoost v1
+- Added first pattern detection - FVG XGBoost v1
 ### 1.1
-- Added Gate-PatchTST v1
+- Added Gate PatchTST v1
 ### 1.0
-- Added first model - Gate-XGBoost v1
+- Added first model - Gate XGBoost v1
 <br/>

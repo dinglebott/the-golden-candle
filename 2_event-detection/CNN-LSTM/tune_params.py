@@ -77,14 +77,14 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 
 def objective(trial):
-    seq_len = trial.suggest_categorical("seq_len", [20, 30, 40, 50])
-    conv_filters = trial.suggest_categorical("conv_filters", [32, 64, 128])
-    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7])
-    lstm_hidden = trial.suggest_categorical("lstm_hidden", [64, 128, 256])
+    seq_len = trial.suggest_categorical("seq_len", [20, 25, 30, 35, 40, 45, 50])
+    conv_filters = trial.suggest_categorical("conv_filters", [32, 48, 64, 96, 128])
+    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7, 9])
+    lstm_hidden = trial.suggest_categorical("lstm_hidden", [64, 96, 128, 192, 256])
     lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
-    dropout = trial.suggest_float("dropout", 0.1, 0.6)
-    lr = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128])
+    dropout = trial.suggest_float("dropout", 0.1, 0.4)
+    lr = trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True)
+    batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96, 128])
 
     fold_scores = []
     for train_idxs, val_idxs in cross_val_splits(len(instances_tuning), 4, 0.1):
@@ -168,7 +168,7 @@ def objective(trial):
 
 
 study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=60, show_progress_bar=True)
+study.optimize(objective, n_trials=80, show_progress_bar=True)
 
 # RECORD RESULTS
 best = study.best_params

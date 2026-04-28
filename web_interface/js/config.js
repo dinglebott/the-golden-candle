@@ -53,4 +53,29 @@ const PATTERN_CONFIGS = [
             `;
         }
     },
+
+    {
+        id: "order_block",
+        label: "CNN-LSTM ORDER BLOCK",
+        endpoint: "/pattern/order_block",
+        classes: {
+            "0": { label: "NO FILL", badge: "X", color: "#f87171" },
+            "1": { label: "FILL", badge: "FILL", color: "#4ade80" },
+        },
+        renderMeta(metaEl, meta) {
+            const dirColor = meta.direction === "bullish" ? "#4ade80" : "#f87171";
+            // detection_time is the open of candle i; +1h gives the start of the fill window
+            const dt = new Date(meta.detection_time);
+            dt.setUTCHours(dt.getUTCHours() + 1);
+            const timeStr = dt.toLocaleString("en-SG", {
+                hour: "2-digit", minute: "2-digit", hour12: false,
+                timeZone: "Asia/Singapore"
+            });
+            metaEl.innerHTML = `
+                <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
+                <span class="pattern-gap">${formatPrice(meta.ob_low)} – ${formatPrice(meta.ob_high)}</span>
+                <span class="pattern-time">${timeStr} SGT</span>
+            `;
+        }
+    },
 ];

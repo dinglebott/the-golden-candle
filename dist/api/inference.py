@@ -13,6 +13,7 @@ patchTstGateVersion = 1
 # Add new pattern names and their model versions here when deploying a new pattern model.
 PATTERN_VERSIONS: dict[str, int] = {
     "fvg": 2,
+    "order_block": 1
 }
 
 _patchTstGateModel = None

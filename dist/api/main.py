@@ -8,6 +8,7 @@ from api.inference import loadModels, predictPatchTST, predictCnnLstm, PATTERN_V
 from api.models import PredictionResponse, CandleInfo, PatternResponse
 from api.data_processing import getData, parseData, parseLiveCorrelated
 import api.fair_value_gap as fvg_detector
+import api.order_block as order_block_detector
 
 logger = logging.getLogger(__name__)
 GATE_ARTIFACTS = Path("artifacts/gate")
@@ -31,10 +32,30 @@ PATTERN_REGISTRY: dict[str, dict] = {
             "gap_high": inst["gap_high"],
             "gap_atr_ratio": inst["gap_atr_ratio"],
             "detection_time": str(inst["time"]),
-            "tp": inst["gap_low"] + 0.5 * inst["gap_size"],
-            "sl": inst["candle_high"] + 1.5 * (inst["gap_size"] / inst["gap_atr_ratio"])
+            "tp": inst["fill_target"],
+            "sl": inst["candle_high"] + 1.5 * inst["atr"]
                   if inst["direction"] == 1
-                  else inst["candle_low"] - 1.5 * (inst["gap_size"] / inst["gap_atr_ratio"]),
+                  else inst["candle_low"] - 1.5 * inst["atr"],
+        },
+    },
+
+    "order_block": {
+        "detector": order_block_detector,
+        "detector_kwargs": {},
+        "n_active": N_VALUE,
+        "pred_labels": {0: "NO FILL", 1: "FILL"},
+        "get_meta": lambda inst: {
+            "direction": "bullish" if inst["direction"] == 1 else "bearish",
+            "ob_high": inst["ob_high"],
+            "ob_low": inst["ob_low"],
+            "impulse_atr_ratio": inst["impulse_atr_ratio"],
+            "zone_size_atr_ratio": inst["zone_size_atr_ratio"],
+            "candles_elapsed": inst["candles_elapsed"],
+            "detection_time": str(inst["time"]),
+            "tp": inst["fill_target"],
+            "sl": inst["ob_low"] - 0.5 * inst["atr"]
+                  if inst["direction"] == 1
+                  else inst["ob_high"] + 0.5 * inst["atr"],
         },
     },
 }
@@ -50,7 +71,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Golden Candle API",
-    version="1.3",
+    version="1.4",
     lifespan=lifespan
 )
 

@@ -65,8 +65,6 @@ candidate_seq_features = [
     "dist_smooth14", "dist_smooth35", "smooth_cross",
     "rsi_14", "macd_hist", "vol_ratio", "vol_momentum", "adx", "di_diff",
     "fast_pct_R", "slow_pct_R",
-    "close_lag1", "close_lag2", "close_lag3", "close_lag4",
-    "vol_lag1", "vol_lag2", "vol_lag3", "vol_lag4",
     "tod_sin", "tod_cos",
     "body_to_range", "close_in_bar",
     "cum_return_3", "cum_return_6", "cum_return_12", "cum_return_24",

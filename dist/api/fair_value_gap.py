@@ -29,8 +29,9 @@ def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:
                     "gap_high": bull_gap_high,
                     "gap_size": gap_size,
                     "gap_atr_ratio": gap_size / atr,
-                    "fill_target": (bull_gap_low + bull_gap_high) / 2,
                     "candle_high": highs[i],
+                    "atr": atrs[i],
+                    "fill_target": (bull_gap_low + bull_gap_high) / 2,
                 })
 
         # Bearish FVG: gap between candle[i] high and candle[i-2] low
@@ -47,8 +48,9 @@ def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:
                     "gap_high": bear_gap_high,
                     "gap_size": gap_size,
                     "gap_atr_ratio": gap_size / atr,
-                    "fill_target": (bear_gap_low + bear_gap_high) / 2,
                     "candle_low": lows[i],
+                    "atr": atrs[i],
+                    "fill_target": (bear_gap_low + bear_gap_high) / 2,
                 })
 
     return instances
