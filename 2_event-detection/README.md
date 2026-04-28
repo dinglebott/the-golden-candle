@@ -31,9 +31,15 @@ Each model architecture has its own folder: XGBoost, CNN-LSTM, PatchTST. Within 
 
 ## PATTERNS
 **Fair value gap (FVG)**\
-3-candle pattern, defined as the gap between the extremes (highs/lows) of the 1st and 3rd candles. Indicates a large buying/selling impulse which causes a region of unfilled orders. The expected resolution is that the market returns to touch the gap before continuing its trend.\
+3-candle pattern, defined as the gap between the extremes (highs/lows) of the 1st and 3rd candles. Indicates a large buying/selling impulse which causes a region of unfilled orders. The expected resolution is that the market returns to touch the gap (before continuing its trend).\
 TP - 50% mark of the gap\
 SL - 1.5 &times; ATR beyond the extreme of the 3rd candle\
+<br/>
+
+**Order block**\
+Defined as the last candle of a different colour right before a large move in the opposite direction (e.g. red candle right before 3 large green candles). Similar concept to a fair value gap, but on a larger scale. The first candle to close back inside the order block range within the next 48 hours is the detection candle. If a candle closes beyond the order block, that order block is invalidated. The expected resolution is that the market rebounds again in the same direction as last time.\
+TP - 1 &times; ATR from the close price of the detection candle\
+SL - 0.5 &times; ATR beyond the further end of the order block (below the order block low for a bullish OB and vice versa)\
 <br/>
 
 
