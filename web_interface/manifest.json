@@ -12,7 +12,15 @@
   "icons": [
     {
       "src": "assets/maskable.png",
-      "purpose": "any maskable"
+      "sizes": "1920x1920",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/maskable.png",
+      "sizes": "1920x1920",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
