@@ -25,7 +25,7 @@ PATTERN_REGISTRY: dict[str, dict] = {
         "detector": fvg_detector,
         "detector_kwargs": {"min_gap_atr_ratio": MIN_GAP_ATR_RATIO},
         "n_active": N_VALUE,                         # trailing bars that count as active signal
-        "pred_labels": {0: "NO_FILL", 1: "FILL"},   # maps class index to prediction string
+        "pred_labels": {0: "NO FILL", 1: "FILL"},   # maps class index to prediction string
         "get_meta": lambda inst: {                   # extracts human-readable metadata for the response
             "direction": "bullish" if inst["direction"] == 1 else "bearish",
             "gap_low": inst["gap_low"],
