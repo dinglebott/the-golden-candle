@@ -37,14 +37,14 @@ def loadModels():
     _patchTstGateCheckpoint = checkpoint
 
     for name, version in PATTERN_VERSIONS.items():
-        ckpt = torch.load(
+        checkpoint = torch.load(
             Path(f"artifacts/{name}") / f"CNN-LSTM_EUR_USD_H1_2026_v{version}.pt",
             map_location="cpu",
             weights_only=False,
         )
-        cfg = ckpt["config"]
-        seq_features = ckpt["seq_features"]
-        meta_features = ckpt["meta_features"]
+        cfg = checkpoint["config"]
+        seq_features = checkpoint["seq_features"]
+        meta_features = checkpoint["meta_features"]
         model = CnnLstm(
             n_seq_features=len(seq_features),
             n_meta_features=len(meta_features),
@@ -54,19 +54,19 @@ def loadModels():
             lstm_layers=cfg["lstm_layers"],
             dropout=cfg["dropout"],
         )
-        model.load_state_dict(ckpt["model_state_dict"])
+        model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
-        ckpt["_model"] = model
-        _cnnLstmModels[name] = ckpt
+        checkpoint["_model"] = model
+        _cnnLstmModels[name] = checkpoint
 
 
 def predictCnnLstm(name: str, df: pd.DataFrame, instance: dict, pred_labels: dict[int, str]) -> dict:
-    ckpt = _cnnLstmModels[name]
-    seq_features = ckpt["seq_features"]
-    meta_features = ckpt["meta_features"]
-    norm = ckpt["normalization"]
-    seq_len = ckpt["config"]["seq_len"]
-    model = ckpt["_model"]
+    checkpoint = _cnnLstmModels[name]
+    seq_features = checkpoint["seq_features"]
+    meta_features = checkpoint["meta_features"]
+    norm = checkpoint["normalization"]
+    seq_len = checkpoint["config"]["seq_len"]
+    model = checkpoint["_model"]
 
     idx = instance["index"]
     seq = df.iloc[idx - seq_len + 1 : idx + 1][seq_features].values.astype(np.float32)
