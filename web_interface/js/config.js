@@ -7,7 +7,7 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // every 30min
 const GATE_CONFIGS = [
     {
         id: "patchTstGate",
-        label: "PatchTST Gate",
+        label: "Gate (PatchTST)",
         versionKey: "patchTstGateVersion",
         predKey: "patchTstGatePred",
         probsKey: "patchTstGateProbs",
@@ -31,7 +31,7 @@ const GATE_CONFIGS = [
 const PATTERN_CONFIGS = [
     {
         id: "fvg",
-        label: "CNN-LSTM FVG",
+        label: "FVG (CNN-LSTM)",
         endpoint: "/pattern/fvg",
         classes: {
             "0": { label: "NO FILL", badge: "X", color: "#f87171" },
@@ -56,7 +56,7 @@ const PATTERN_CONFIGS = [
 
     {
         id: "order_block",
-        label: "CNN-LSTM ORDER BLOCK",
+        label: "Order Block (CNN-LSTM)",
         endpoint: "/pattern/order_block",
         classes: {
             "0": { label: "NO FILL", badge: "X", color: "#f87171" },
