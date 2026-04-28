@@ -1,0 +1,17 @@
+{
+  "name": "The Golden Candle",
+  "short_name": "Golden Candle",
+  "description": "Live trading signals for EUR/USD H1.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d10",
+  "theme_color": "#DAA520",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "logo.png"
+    }
+  ]
+}
