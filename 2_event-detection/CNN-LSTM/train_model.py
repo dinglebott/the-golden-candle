@@ -118,6 +118,7 @@ model = CnnLstm(
     lstm_hidden=params["lstm_hidden"],
     lstm_layers=params["lstm_layers"],
     dropout=params["dropout"],
+    head_hidden=params.get("head_hidden"),
 ).to(device)
 
 n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -134,7 +135,7 @@ patience = params["patience"]
 optimizer = torch.optim.AdamW(model.parameters(), lr=params["learning_rate"], weight_decay=params.get("weight_decay", 0.0))
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
-train_loader = DataLoader(EventDataset(X_train_seq, X_train_meta, y_train), batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(EventDataset(X_train_seq, X_train_meta, y_train), batch_size=batch_size, shuffle=True, drop_last=True)
 val_loader = DataLoader(EventDataset(X_val_seq, X_val_meta, y_val), batch_size=batch_size)
 
 # TRAINING LOOP

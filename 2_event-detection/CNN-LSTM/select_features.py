@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from sklearn.metrics import average_precision_score
-import shap
 import pandas as pd
 from pathlib import Path
 
@@ -15,6 +14,14 @@ from data_processing import dataparser
 from patterns import registry
 from symmetry import build_flip_mask, build_swap_indices, apply_flip
 from classes import EventDataset, CnnLstm
+
+SEED = 42
+N_REPEATS = 5
+torch.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)
+np.random.seed(SEED)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 # LOAD CONFIGS
 with open(Path(__file__).parent.parent / "env.json", "r") as f:
@@ -26,34 +33,16 @@ n = env["n_value"]
 train_split = env["train_split"]
 val_split = env["val_split"]
 pattern = env["pattern"]
+device = torch.device(env["device"] if torch.cuda.is_available() else "cpu")
 
 # LOAD EVENT DETECTOR
 pattern_module = registry.load(pattern)
 
-# LOAD MODEL PARAMS — use training_models config if present, else fall back to defaults
-_params_path = Path(__file__).parent / f"model_configs/training_models/{pattern}_params.json"
-if _params_path.exists():
-    with open(_params_path) as f:
-        _p = json.load(f)
-    SEQ_LEN       = _p["seq_len"]
-    CONV_FILTERS  = _p["conv_filters"]
-    CONV_KERNEL   = _p["conv_kernel_size"]
-    LSTM_HIDDEN   = _p["lstm_hidden"]
-    LSTM_LAYERS   = _p["lstm_layers"]
-    DROPOUT       = _p["dropout"]
-    LR            = _p["learning_rate"]
-    BATCH_SIZE    = _p["batch_size"]
-    print(f"Loaded params from model_configs/training_models/{pattern}_params.json")
-else:
-    SEQ_LEN       = 20
-    CONV_FILTERS  = 64
-    CONV_KERNEL   = 3
-    LSTM_HIDDEN   = 128
-    LSTM_LAYERS   = 1
-    DROPOUT       = 0.2
-    LR            = 0.001
-    BATCH_SIZE    = 64
-    print(f"No training_models config found for {pattern} — using default params")
+# LOAD MODEL PARAMS
+with open(Path(__file__).parent / f"model_configs/training_models/{pattern}_params.json") as f:
+    params = json.load(f)
+print(f"Loaded params from model_configs/training_models/{pattern}_params.json")
+print("Hyperparameters:", params)
 
 candidate_seq_features = [
     "open_return", "high_return", "low_return", "close_return", "vol_return",
@@ -106,10 +95,11 @@ def build_sequences(df, instances, seq_len, seq_features, meta_features):
         y.append(inst["label"])
     return np.array(X_seq), np.array(X_meta), np.array(y, dtype=np.float32)
 
-X_train_seq, X_train_meta, y_train = build_sequences(df, train_instances, SEQ_LEN, candidate_seq_features, meta_features)
-X_val_seq,   X_val_meta,   y_val   = build_sequences(df, val_instances,   SEQ_LEN, candidate_seq_features, meta_features)
+seq_len = params["seq_len"]
+X_train_seq, X_train_meta, y_train = build_sequences(df, train_instances, seq_len, candidate_seq_features, meta_features)
+X_val_seq,   X_val_meta,   y_val   = build_sequences(df, val_instances,   seq_len, candidate_seq_features, meta_features)
 
-# NORMALIZE
+# NORMALIZE — fit on train only
 seq_mean = X_train_seq.mean(axis=(0, 1), keepdims=True)
 seq_std = X_train_seq.std(axis=(0, 1), keepdims=True) + 1e-8
 meta_mean = X_train_meta.mean(axis=0, keepdims=True)
@@ -122,36 +112,37 @@ X_val_meta = (X_val_meta - meta_mean) / meta_std
 
 print(f"Train: {len(X_train_seq)} | Val: {len(X_val_seq)}")
 
-# TRAIN TEMP MODEL (CPU only — required for SHAP GradientExplainer)
-device = torch.device("cpu")
-
+# TRAIN TEMP MODEL ON FULL CANDIDATE SET
 model = CnnLstm(
     n_seq_features=len(candidate_seq_features),
     n_meta_features=len(meta_features),
-    conv_filters=CONV_FILTERS,
-    conv_kernel_size=CONV_KERNEL,
-    lstm_hidden=LSTM_HIDDEN,
-    lstm_layers=LSTM_LAYERS,
-    dropout=DROPOUT,
+    conv_filters=params["conv_filters"],
+    conv_kernel_size=params["conv_kernel_size"],
+    lstm_hidden=params["lstm_hidden"],
+    lstm_layers=params["lstm_layers"],
+    dropout=params["dropout"],
+    head_hidden=params.get("head_hidden"),
 ).to(device)
 
 pos_count = y_train.sum()
 neg_count = len(y_train) - pos_count
-pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32)
+pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32).to(device)
 criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+optimizer = torch.optim.AdamW(model.parameters(), lr=params["learning_rate"], weight_decay=params.get("weight_decay", 0.0))
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=params["epochs"], eta_min=1e-6)
 
-train_loader = DataLoader(EventDataset(X_train_seq, X_train_meta, y_train), batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(EventDataset(X_val_seq, X_val_meta, y_val), batch_size=BATCH_SIZE)
+batch_size = params["batch_size"]
+train_loader = DataLoader(EventDataset(X_train_seq, X_train_meta, y_train), batch_size=batch_size, shuffle=True, drop_last=True)
+val_loader = DataLoader(EventDataset(X_val_seq, X_val_meta, y_val), batch_size=batch_size)
 
 best_val_ap = -1.0
-patience_counter = 15
+patience_counter = 0
 best_state = None
-PATIENCE = 10
 
-for epoch in range(1, 31):
+for epoch in range(1, params["epochs"] + 1):
     model.train()
     for x_seq, x_meta, y_batch in train_loader:
+        x_seq, x_meta, y_batch = x_seq.to(device), x_meta.to(device), y_batch.to(device)
         optimizer.zero_grad()
         loss = criterion(model(x_seq, x_meta), y_batch)
         loss.backward()
@@ -161,62 +152,74 @@ for epoch in range(1, 31):
     val_logits_list, val_labels_list = [], []
     with torch.no_grad():
         for x_seq, x_meta, y_batch in val_loader:
-            val_logits_list.append(model(x_seq, x_meta))
+            val_logits_list.append(model(x_seq.to(device), x_meta.to(device)).cpu())
             val_labels_list.append(y_batch)
     val_probs = torch.sigmoid(torch.cat(val_logits_list)).numpy()
     val_ap = average_precision_score(torch.cat(val_labels_list).numpy(), val_probs)
+    scheduler.step()
 
     if val_ap > best_val_ap:
         best_val_ap = val_ap
-        best_state = {key: val.clone() for key, val in model.state_dict().items()}
+        best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
         patience_counter = 0
     else:
         patience_counter += 1
-        if patience_counter >= PATIENCE:
+        if patience_counter >= params["patience"]:
             print(f"Early stopping at epoch {epoch}")
             break
 
-    if epoch % 10 == 0:
-        print(f"Epoch {epoch:3d} | val AP: {val_ap:.4f} | best: {best_val_ap:.4f}")
+    print(f"Epoch {epoch:3d} | val AP: {val_ap:.4f} | best: {best_val_ap:.4f}")
 
 model.load_state_dict(best_state)
 model.eval()
 
-# SHAP — GradientExplainer with multi-input model
-# shap_values returns [shap_seq, shap_meta]:
-#   shap_seq:  (n_explain, seq_len, n_seq_features)
-#   shap_meta: (n_explain, n_meta_features)
-# Average |SHAP| over (samples, timesteps) for seq, over samples for meta.
-N_BACKGROUND = 100
-N_EXPLAIN = min(200, len(X_val_seq))
+# PERMUTATION IMPORTANCE
+# For each feature, shuffle its values on the val set and measure the drop in val AP.
+# Repeated N_REPEATS times per feature with different shuffles, then averaged.
+def evaluate_val(X_seq, X_meta):
+    loader = DataLoader(EventDataset(X_seq, X_meta, y_val), batch_size=batch_size)
+    logits_list, labels_list = [], []
+    with torch.no_grad():
+        for x_seq, x_meta, y_batch in loader:
+            logits_list.append(model(x_seq.to(device), x_meta.to(device)).cpu())
+            labels_list.append(y_batch)
+    probs = torch.sigmoid(torch.cat(logits_list)).numpy()
+    return average_precision_score(torch.cat(labels_list).numpy(), probs)
 
-bg_seq = torch.tensor(X_train_seq[:N_BACKGROUND])
-bg_meta = torch.tensor(X_train_meta[:N_BACKGROUND])
-ex_seq = torch.tensor(X_val_seq[:N_EXPLAIN])
-ex_meta = torch.tensor(X_val_meta[:N_EXPLAIN])
+baseline_ap = evaluate_val(X_val_seq, X_val_meta)
+print(f"\nBaseline val AP (full feature set): {baseline_ap:.4f}")
 
-print("Computing SHAP values...")
+print(f"\nComputing permutation importance ({N_REPEATS} repeats per feature)...")
+rng = np.random.default_rng(SEED)
+importances = {}
 
-# GradientExplainer requires (batch, n_outputs) — wrap to unsqueeze the scalar output
-class _Wrapper(nn.Module):
-    def forward(self, x_seq, x_meta):
-        return model(x_seq, x_meta).unsqueeze(1)
+# SEQUENCE FEATURES — shuffle column across (samples × timesteps)
+n_val, t_len, _ = X_val_seq.shape
+for i, feat in enumerate(candidate_seq_features):
+    drops = []
+    for _ in range(N_REPEATS):
+        X_perturb = X_val_seq.copy()
+        flat = X_perturb[:, :, i].reshape(-1)
+        X_perturb[:, :, i] = rng.permutation(flat).reshape(n_val, t_len)
+        ap = evaluate_val(X_perturb, X_val_meta)
+        drops.append(baseline_ap - ap)
+    importances[feat] = float(np.mean(drops))
+    print(f"  {feat:30s} ΔAP = {importances[feat]:+.5f}")
 
-explainer = shap.GradientExplainer(_Wrapper(), [bg_seq, bg_meta])
-shap_values = explainer.shap_values([ex_seq, ex_meta])
+# META FEATURES — shuffle across samples
+for i, feat in enumerate(meta_features):
+    drops = []
+    for _ in range(N_REPEATS):
+        X_perturb = X_val_meta.copy()
+        X_perturb[:, i] = rng.permutation(X_perturb[:, i])
+        ap = evaluate_val(X_val_seq, X_perturb)
+        drops.append(baseline_ap - ap)
+    importances[feat] = float(np.mean(drops))
+    print(f"  {feat:30s} ΔAP = {importances[feat]:+.5f}")
 
-# shap_values is [shap_seq, shap_meta] — one array per input
-shap_seq, shap_meta = shap_values[0], shap_values[1]
-
-shap_seq_arr = np.abs(shap_seq).mean(axis=(0, 1)).flatten()
-shap_meta_arr = np.abs(shap_meta).mean(axis=0).flatten()
-
-importances = pd.Series(
-    np.concatenate([shap_seq_arr, shap_meta_arr]),
-    index=candidate_seq_features + meta_features,
-)
-importances.sort_values(ascending=False, inplace=True)
-print(f"\n{importances}")
+importances_series = pd.Series(importances).sort_values(ascending=False)
+print(f"\n{importances_series}")
 
 (Path(__file__).parent / "results").mkdir(exist_ok=True)
-importances.to_json(Path(__file__).parent / f"results/{pattern}_feature_rankings.json", indent=4)
+importances_series.to_json(Path(__file__).parent / f"results/{pattern}_feature_rankings.json", indent=4)
+print(f"\nSaved rankings to results/{pattern}_feature_rankings.json")

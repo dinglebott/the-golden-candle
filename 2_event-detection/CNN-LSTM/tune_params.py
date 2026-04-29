@@ -80,14 +80,15 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 
 def objective(trial):
-    seq_len = trial.suggest_categorical("seq_len", [30, 35, 40, 45, 50])
-    conv_filters = trial.suggest_categorical("conv_filters", [32, 48, 64, 96])
+    seq_len = trial.suggest_categorical("seq_len", [20, 25, 30, 35, 40])
+    conv_filters = trial.suggest_categorical("conv_filters", [16, 24, 32, 48])
     conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7])
-    lstm_hidden = trial.suggest_categorical("lstm_hidden", [48, 64, 96, 128, 192])
+    lstm_hidden = trial.suggest_categorical("lstm_hidden", [24, 32, 48, 64, 96])
     lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
-    dropout = trial.suggest_float("dropout", 0.05, 0.3)
-    lr = trial.suggest_float("learning_rate", 1e-4, 3e-3)
-    weight_decay = trial.suggest_float("weight_decay", 1e-4, 3e-3)
+    head_hidden = trial.suggest_categorical("head_hidden", [None, 16, 24, 32, 48, 64])
+    dropout = trial.suggest_float("dropout", 0.1, 0.5)
+    lr = trial.suggest_float("learning_rate", 1e-4, 5e-3)
+    weight_decay = trial.suggest_float("weight_decay", 1e-4, 5e-3)
     batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96])
 
     fold_scores = []
@@ -120,6 +121,7 @@ def objective(trial):
             lstm_hidden=lstm_hidden,
             lstm_layers=lstm_layers,
             dropout=dropout,
+            head_hidden=head_hidden,
         ).to(device)
 
         pos_count = y_tr.sum()
@@ -127,15 +129,16 @@ def objective(trial):
         pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32).to(device)
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30, eta_min=1e-6)
 
-        train_loader = DataLoader(EventDataset(X_tr_seq, X_tr_meta, y_tr), batch_size=batch_size, shuffle=True)
+        train_loader = DataLoader(EventDataset(X_tr_seq, X_tr_meta, y_tr), batch_size=batch_size, shuffle=True, drop_last=True)
         val_loader   = DataLoader(EventDataset(X_vl_seq, X_vl_meta, y_vl), batch_size=batch_size)
 
-        best_fold_ap = -1.0
+        val_aps = []
+        best_val_ap = -1.0
         patience_counter = 0
-        ema_ap = None
 
-        for _ in range(30):
+        for _ in range(40):
             model.train()
             for x_seq, x_meta, y_batch in train_loader:
                 x_seq, x_meta, y_batch = x_seq.to(device), x_meta.to(device), y_batch.to(device)
@@ -154,18 +157,19 @@ def objective(trial):
                 torch.cat(val_labels).numpy(),
                 torch.sigmoid(torch.cat(val_logits)).numpy(),
             )
+            val_aps.append(val_ap)
+            scheduler.step()
 
-            ema_ap = val_ap if ema_ap is None else 0.3 * val_ap + 0.7 * ema_ap
-
-            if ema_ap > best_fold_ap:
-                best_fold_ap = ema_ap
+            if val_ap > best_val_ap:
+                best_val_ap = val_ap
                 patience_counter = 0
             else:
                 patience_counter += 1
-                if patience_counter >= 15:
+                if patience_counter >= 7:
                     break
-
-        fold_scores.append(best_fold_ap)
+        
+        # return mean of top 3 epochs
+        fold_scores.append(float(np.mean(sorted(val_aps)[-3:])) if val_aps else 0.0)
         torch.cuda.empty_cache()
 
     return np.mean(fold_scores) if fold_scores else 0.0
@@ -185,11 +189,12 @@ final_params = {
     "conv_kernel_size": best["conv_kernel_size"],
     "lstm_hidden":      best["lstm_hidden"],
     "lstm_layers":      best["lstm_layers"],
+    "head_hidden":      best["head_hidden"],
     "dropout":          round(best["dropout"], 6),
     "learning_rate":    round(best["learning_rate"], 6),
     "weight_decay":     round(best["weight_decay"], 8),
     "batch_size":       best["batch_size"],
-    "epochs":           30,
+    "epochs":           40,
     "patience":         15,
 }
 
