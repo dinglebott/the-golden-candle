@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data_processing import dataparser
 from patterns import registry
+from symmetry import build_flip_mask, build_swap_indices, apply_flip
 from classes import EventDataset, CnnLstm
 
 SEED = 42
@@ -73,6 +74,9 @@ seq_features = [f for f in best_features if f not in meta_features]
 
 # BUILD SEQUENCES
 # For each instance at df index i, extract the seq_len candles ending at i.
+flip_mask = build_flip_mask(seq_features)
+swap_indices = build_swap_indices(seq_features)
+
 def build_sequences(df, instances, seq_len, seq_features, meta_features):
     X_seq, X_meta, y = [], [], []
     for inst in instances:
@@ -80,6 +84,7 @@ def build_sequences(df, instances, seq_len, seq_features, meta_features):
         if idx < seq_len - 1:
             continue
         seq = df.iloc[idx - seq_len + 1 : idx + 1][seq_features].values.astype(np.float32)
+        seq = apply_flip(seq, inst["direction"], flip_mask, swap_indices)
         meta = np.array([inst[f] for f in meta_features], dtype=np.float32)
         X_seq.append(seq)
         X_meta.append(meta)

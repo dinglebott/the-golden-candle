@@ -4,7 +4,22 @@ import numpy as np
 METADATA_FEATURES = ["sweep_atr_ratio", "direction"]
 
 
-def detect(df: pd.DataFrame, lookback: int = 50, min_sweep_atr_ratio: float = 0.3) -> list[dict]:
+def detect(
+    df: pd.DataFrame,
+    lookback: int = 50,
+    min_sweep_atr_ratio: float = 0.3,
+    min_wick_body_ratio: float = 1.0,
+    min_reclaim_frac: float = 0.5,
+) -> list[dict]:
+    """Detect liquidity sweeps with rejection-quality filters.
+
+    min_wick_body_ratio: rejection wick (beyond the swept level's side of the
+        candle) must be at least this multiple of the candle body. >=1.0 means
+        the wick dominates the body — i.e. a real rejection, not a runaway bar.
+    min_reclaim_frac: close must reclaim back inside the level by at least this
+        fraction of the sweep size. 0.5 = close at least halfway back through.
+    """
+    opens = df["open"].values
     highs = df["high"].values
     lows = df["low"].values
     closes = df["close"].values
@@ -15,9 +30,11 @@ def detect(df: pd.DataFrame, lookback: int = 50, min_sweep_atr_ratio: float = 0.
 
     for i in range(lookback + 1, len(df)):
         atr = atrs[i]
+        candle_open = opens[i]
         candle_high = highs[i]
         candle_low = lows[i]
         candle_close = closes[i]
+        body = abs(candle_close - candle_open)
 
         prior_highs = highs[i - lookback: i]
         prior_lows = lows[i - lookback: i]
@@ -27,7 +44,11 @@ def detect(df: pd.DataFrame, lookback: int = 50, min_sweep_atr_ratio: float = 0.
         # Bearish sweep: wick pierces above swing high but candle closes back below it
         if candle_high > swing_high and candle_close < swing_high:
             sweep_size = candle_high - swing_high
-            if sweep_size >= min_sweep_atr_ratio * atr:
+            upper_wick = candle_high - max(candle_open, candle_close)
+            reclaim = swing_high - candle_close
+            if (sweep_size >= min_sweep_atr_ratio * atr
+                    and upper_wick >= min_wick_body_ratio * body
+                    and reclaim >= min_reclaim_frac * sweep_size):
                 instances.append({
                     "index": i,
                     "time": times[i],
@@ -43,7 +64,11 @@ def detect(df: pd.DataFrame, lookback: int = 50, min_sweep_atr_ratio: float = 0.
         # Bullish sweep: wick pierces below swing low but candle closes back above it
         if candle_low < swing_low and candle_close > swing_low:
             sweep_size = swing_low - candle_low
-            if sweep_size >= min_sweep_atr_ratio * atr:
+            lower_wick = min(candle_open, candle_close) - candle_low
+            reclaim = candle_close - swing_low
+            if (sweep_size >= min_sweep_atr_ratio * atr
+                    and lower_wick >= min_wick_body_ratio * body
+                    and reclaim >= min_reclaim_frac * sweep_size):
                 instances.append({
                     "index": i,
                     "time": times[i],

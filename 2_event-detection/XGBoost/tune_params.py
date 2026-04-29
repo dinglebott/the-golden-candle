@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data_processing import dataparser
 from patterns import registry
+from symmetry import apply_flip_df
 
 # shut up optuna
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -50,6 +51,7 @@ event_df = df.iloc[indices].copy().reset_index(drop=True)
 event_df["target"] = [inst["label"] for inst in labelled]
 for feat in pattern_module.METADATA_FEATURES:
     event_df[feat] = [inst[feat] for inst in labelled]
+apply_flip_df(event_df, [inst["direction"] for inst in labelled])
 
 val_end = int((train_split + val_split) * len(event_df))
 event_df = event_df.iloc[:val_end]

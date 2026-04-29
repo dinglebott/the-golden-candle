@@ -1,0 +1,13 @@
+{
+    "seq_len": 50,
+    "conv_filters": 48,
+    "conv_kernel_size": 7,
+    "lstm_hidden": 256,
+    "lstm_layers": 1,
+    "dropout": 0.307062,
+    "learning_rate": 0.0008,
+    "weight_decay": 4e-4,
+    "batch_size": 128,
+    "epochs": 60,
+    "patience": 20
+}

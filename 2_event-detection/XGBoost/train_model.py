@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data_processing import dataparser
 from patterns import registry
+from symmetry import apply_flip_df
 
 # LOAD CONFIGS
 with open(Path(__file__).parent.parent / "env.json", "r") as f:
@@ -54,6 +55,7 @@ def build_event_df(df, instances):
     event_df["target"] = [inst["label"] for inst in instances]
     for feat in pattern_module.METADATA_FEATURES:
         event_df[feat] = [inst[feat] for inst in instances]
+    apply_flip_df(event_df, [inst["direction"] for inst in instances])
     return event_df
 
 train_end = int(train_split * len(labelled))
