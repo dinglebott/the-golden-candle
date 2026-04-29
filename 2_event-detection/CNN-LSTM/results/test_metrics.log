@@ -1,5 +1,5 @@
 === v1 | EUR_USD H1 | fvg | CNN-LSTM | 2026-04-26 09:32:05 ===
-NOTE: fill target was changed to halfway mark of the gap. This model uses the old target (closer edge of gap) and is deprecated.
+NOTE: Fill target was changed to halfway mark of the gap. This model uses the old target (closer edge of gap) and is deprecated.
 Pattern instances: 11834 / 134741 candles (8.8%)
 Train instances: 9466 | Val: 1183 | Test: 1184
 
@@ -17,6 +17,7 @@ True=no_fill: avg P(no_fill)=0.602 P(fill)=0.398
 True=fill: avg P(no_fill)=0.414 P(fill)=0.586
 
 === v2 | EUR_USD H1 | fvg | CNN-LSTM | 2026-04-26 21:34:35 ===
+NOTE: Features were symmetrised by multiplying by direction. This model uses un-symmetrised features and is deprecated.
 Pattern instances: 11834 / 134741 candles (8.8%)
 Train instances: 9465 | Val: 1183 | Test: 1184
 
@@ -34,6 +35,7 @@ True=no_fill: avg P(no_fill)=0.580 P(fill)=0.420
 True=fill: avg P(no_fill)=0.430 P(fill)=0.570
 
 === v1 | EUR_USD H1 | order_block | CNN-LSTM | 2026-04-28 14:51:36 ===
+NOTE: Features were symmetrised by multiplying by direction. This model uses un-symmetrised features and is deprecated.
 Pattern instances: 7925 / 134741 candles (5.9%)
 Train instances: 6340 | Val: 792 | Test: 793
 

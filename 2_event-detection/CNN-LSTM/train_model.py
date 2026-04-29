@@ -41,11 +41,11 @@ version = env["cnn_lstm"]["train_version"]
 pattern_module = registry.load(pattern)
 
 # LOAD MODEL CONFIGS
-with open(Path(__file__).parent / f"model_configs/v{version}/{pattern}_features.json", "r") as f:
+with open(Path(__file__).parent / f"model_configs/training_models/{pattern}_features.json", "r") as f:
     best_features = json.load(f)["features"]
 print(f"Features ({len(best_features)}):", best_features)
 
-with open(Path(__file__).parent / f"model_configs/v{version}/{pattern}_params.json", "r") as f:
+with open(Path(__file__).parent / f"model_configs/training_models/{pattern}_params.json", "r") as f:
     params = json.load(f)
 seq_len = params["seq_len"]
 print("Hyperparameters:", params)
@@ -248,7 +248,7 @@ artifact = {
     },
     "model_state_dict": best_state,
 }
-model_path = Path(__file__).parent / f"models/{instrument}/{pattern}_CNN-LSTM_{instrument}_{granularity}_{year_now}_v{version}.pt"
+model_path = Path(__file__).parent / f"models/{pattern}_CNN-LSTM_{instrument}_{granularity}_{year_now}_v{version}.pt"
 model_path.parent.mkdir(parents=True, exist_ok=True)
 torch.save(artifact, model_path)
 print(f"Saved to {model_path}")

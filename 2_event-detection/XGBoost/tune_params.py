@@ -27,13 +27,12 @@ train_split = env["train_split"]
 val_split = env["val_split"]
 device = env["device"]
 pattern = env["pattern"]
-version = env["xgb"]["train_version"]
 
 # LOAD EVENT DETECTOR
 pattern_module = registry.load(pattern)
 
 # LOAD MODEL CONFIGS
-with open(Path(__file__).parent / f"model_configs/v{version}/{pattern}_features.json", "r") as f:
+with open(Path(__file__).parent / f"model_configs/training_models/{pattern}_features.json", "r") as f:
     features = json.load(f)["features"]
 print(f"Tuning on {len(features)} features: {features}")
 

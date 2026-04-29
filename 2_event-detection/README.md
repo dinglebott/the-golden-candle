@@ -51,7 +51,7 @@ SL - 0.5 &times; ATR beyond the further end of the order block (below the order 
    - `label_instances(df, instances, n_candles)` — applies triple-barrier labelling and appends `"label": 0 or 1` to each instance dict. Labels must be `1` for "fill" and `0` for "no fill". The SL multiplier (and any other pattern-specific knobs like TP) live as module-level constants at the top of the detector file, not in `env.json`.
 2. Register the pattern in `patterns/registry.py` by adding an entry to `_REGISTRY`.
 3. Set `"pattern": "<pattern_name>"` in `env.json`.
-4. For each model architecture you want to train, create a versioned config folder (`model_configs/v1/`) containing:
+4. For each model architecture you want to train, create a config folder (`model_configs/training_models/`) containing:
    - `<pattern_name>_features.json` — `{"features": [...]}` listing the features to use. Include any `METADATA_FEATURES` here.
    - `<pattern_name>_params.json` — hyperparameters in the format used by that architecture (copy from an existing version as a starting point).
 
@@ -63,15 +63,15 @@ First, set the correct config variables in `env.json`. Below are the variables t
 - `log_metrics` - Controls whether or not to record test metrics when running `train_model.py`
 - `train_version` - Controls the version name of the model produced when running `train_model.py`
 - `use_version` - Controls the model version used when running `use_model.py`
-Next, manually curate a set of features and hyperparameters, placed in the correctly-versioned subfolder (`train_version`). Copy the format you see in `model_configs/`. Also copy the naming scheme (prefix with "gate" or "dir" depending on which binary task you are training for).\
+Next, manually curate a set of features and hyperparameters, placed in the correct subfolder (`training_models/`). Copy the format you see in `model_configs/`. Also copy the naming scheme (add prefix depending on which task you are training for).\
 You can use `select_features.py` and `tune_params.py` to assist with your curation. See below for details.\
 Now you are ready to train. Run `train_model.py` and the model will be saved to `models/`, sorted by instrument.
 
 ### Tuning
 | &nbsp; | `select_features.py` | `tune_params.py` |
 | --- | --- | --- |
-| XGBoost | SHAP importances<br/>Params follow `train_version` | Optuna<br/>Feature set follows `train_version` |
-| CNN-LSTM | SHAP importances<br/>Params follow `train_version` | Optuna<br/>Feature set follows `train_version` |
+| XGBoost | SHAP importances<br/>Params from `training_models` | Optuna<br/>Feature set from `training_models` |
+| CNN-LSTM | SHAP importances<br/>Params from `training_models` | Optuna<br/>Feature set from `training_models` |
 
 ### Running
 To use a model from the terminal, run `use_model.py` with the correct `use_version` set in `env.json`. Live data is fetched and inference is run on it, with the prediction being printed to the terminal.

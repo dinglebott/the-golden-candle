@@ -1,20 +1,19 @@
 {
     "features": [
         "gap_atr_ratio",
-        "close_in_bar",
         "tod_sin",
+        "close_in_bar",
         "return_zscore_24",
+        "volatility_regime",
         "upper_wick",
         "smooth_cross",
-        "volatility_regime",
         "close_return",
-        "tod_cos",
-        "hl_spread",
-        "atr_14",
         "lower_wick",
         "range_pos_24",
-        "body_to_range",
+        "atr_14",
+        "hl_spread",
+        "slow_pct_R",
         "dist_smooth14",
-        "vol_momentum"
+        "tod_cos"
     ]
 }

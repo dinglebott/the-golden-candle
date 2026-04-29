@@ -23,13 +23,12 @@ train_split = env["train_split"]
 val_split = env["val_split"]
 device = env["device"]
 pattern = env["pattern"]
-version = env["xgb"]["train_version"]
 
 # LOAD EVENT DETECTOR
 pattern_module = registry.load(pattern)
 
-# LOAD MODEL PARAMS — use versioned configs if available, else fall back to defaults
-_params_path = Path(__file__).parent / f"model_configs/v{version}/{pattern}_params.json"
+# LOAD MODEL PARAMS — use training_models config if present, else fall back to defaults
+_params_path = Path(__file__).parent / f"model_configs/training_models/{pattern}_params.json"
 if _params_path.exists():
     with open(_params_path) as f:
         _p = json.load(f)
@@ -42,13 +41,13 @@ if _params_path.exists():
         "reg_alpha":        _p["reg_alpha"],
         "reg_lambda":       _p["reg_lambda"],
     }
-    print(f"Loaded params from model_configs/v{version}/{pattern}_params.json")
+    print(f"Loaded params from model_configs/training_models/{pattern}_params.json")
 else:
     _model_params = {
         "max_depth": 4, "learning_rate": 0.1, "subsample": 0.8,
         "colsample_bytree": 0.8, "min_child_weight": 10, "reg_alpha": 1, "reg_lambda": 1,
     }
-    print(f"No model_configs found for v{version} — using default params")
+    print(f"No training_models config found for {pattern} — using default params")
 
 candidate_features = [
     "open_return", "high_return", "low_return", "close_return", "vol_return",

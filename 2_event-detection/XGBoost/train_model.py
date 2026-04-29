@@ -29,11 +29,11 @@ version = env["xgb"]["train_version"]
 pattern_module = registry.load(pattern)
 
 # LOAD MODEL CONFIGS
-with open(Path(__file__).parent / f"model_configs/v{version}/{pattern}_features.json", "r") as f:
+with open(Path(__file__).parent / f"model_configs/training_models/{pattern}_features.json", "r") as f:
     best_features = json.load(f)["features"]
 print(f"Features ({len(best_features)}):", best_features)
 
-with open(Path(__file__).parent / f"model_configs/v{version}/{pattern}_params.json", "r") as f:
+with open(Path(__file__).parent / f"model_configs/training_models/{pattern}_params.json", "r") as f:
     best_params = json.load(f)
 best_params["max_depth"] = int(best_params["max_depth"])
 best_params["min_child_weight"] = int(best_params["min_child_weight"])
@@ -120,6 +120,6 @@ if log_metrics:
         f.write(output + "\n")
 
 # SAVE MODEL
-model_path = Path(__file__).parent / f"models/{instrument}/{pattern}_XGBoost_{instrument}_{granularity}_{year_now}_v{version}.json"
+model_path = Path(__file__).parent / f"models/{pattern}_XGBoost_{instrument}_{granularity}_{year_now}_v{version}.json"
 model_path.parent.mkdir(parents=True, exist_ok=True)
 model.save_model(model_path)

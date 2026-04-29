@@ -26,13 +26,12 @@ n = env["n_value"]
 train_split = env["train_split"]
 val_split = env["val_split"]
 pattern = env["pattern"]
-version = env["cnn_lstm"]["train_version"]
 
 # LOAD EVENT DETECTOR
 pattern_module = registry.load(pattern)
 
-# LOAD MODEL PARAMS — use versioned configs if available, else fall back to defaults
-_params_path = Path(__file__).parent / f"model_configs/v{version}/{pattern}_params.json"
+# LOAD MODEL PARAMS — use training_models config if present, else fall back to defaults
+_params_path = Path(__file__).parent / f"model_configs/training_models/{pattern}_params.json"
 if _params_path.exists():
     with open(_params_path) as f:
         _p = json.load(f)
@@ -44,7 +43,7 @@ if _params_path.exists():
     DROPOUT       = _p["dropout"]
     LR            = _p["learning_rate"]
     BATCH_SIZE    = _p["batch_size"]
-    print(f"Loaded params from model_configs/v{version}/{pattern}_params.json")
+    print(f"Loaded params from model_configs/training_models/{pattern}_params.json")
 else:
     SEQ_LEN       = 20
     CONV_FILTERS  = 64
@@ -54,7 +53,7 @@ else:
     DROPOUT       = 0.2
     LR            = 0.001
     BATCH_SIZE    = 64
-    print(f"No model_configs found for v{version} — using default params")
+    print(f"No training_models config found for {pattern} — using default params")
 
 candidate_seq_features = [
     "open_return", "high_return", "low_return", "close_return", "vol_return",
@@ -146,11 +145,11 @@ train_loader = DataLoader(EventDataset(X_train_seq, X_train_meta, y_train), batc
 val_loader = DataLoader(EventDataset(X_val_seq, X_val_meta, y_val), batch_size=BATCH_SIZE)
 
 best_val_ap = -1.0
-patience_counter = 0
+patience_counter = 15
 best_state = None
 PATIENCE = 10
 
-for epoch in range(1, 61):
+for epoch in range(1, 31):
     model.train()
     for x_seq, x_meta, y_batch in train_loader:
         optimizer.zero_grad()

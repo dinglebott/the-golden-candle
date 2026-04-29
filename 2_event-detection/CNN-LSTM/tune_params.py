@@ -29,13 +29,12 @@ train_split = env["train_split"]
 val_split = env["val_split"]
 device = torch.device(env["device"] if torch.cuda.is_available() else "cpu")
 pattern = env["pattern"]
-version = env["cnn_lstm"]["train_version"]
 
 # LOAD EVENT DETECTOR
 pattern_module = registry.load(pattern)
 
 # LOAD FEATURES
-with open(Path(__file__).parent / f"model_configs/v{version}/{pattern}_features.json") as f:
+with open(Path(__file__).parent / f"model_configs/training_models/{pattern}_features.json") as f:
     features = json.load(f)["features"]
 print(f"Tuning on {len(features)} features: {features}")
 
@@ -82,14 +81,14 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 def objective(trial):
     seq_len = trial.suggest_categorical("seq_len", [30, 35, 40, 45, 50])
-    conv_filters = trial.suggest_categorical("conv_filters", [32, 48, 64, 96, 128])
-    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7, 9])
-    lstm_hidden = trial.suggest_categorical("lstm_hidden", [64, 96, 128, 192, 256])
+    conv_filters = trial.suggest_categorical("conv_filters", [32, 48, 64, 96])
+    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7])
+    lstm_hidden = trial.suggest_categorical("lstm_hidden", [48, 64, 96, 128, 192])
     lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
-    dropout = trial.suggest_float("dropout", 0.05, 0.25)
-    lr = trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True)
-    weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96, 128])
+    dropout = trial.suggest_float("dropout", 0.05, 0.3)
+    lr = trial.suggest_float("learning_rate", 1e-4, 3e-3)
+    weight_decay = trial.suggest_float("weight_decay", 1e-4, 3e-3)
+    batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96])
 
     fold_scores = []
     for train_idxs, val_idxs in cross_val_splits(len(instances_tuning), 4, 0.1):
@@ -136,7 +135,7 @@ def objective(trial):
         patience_counter = 0
         ema_ap = None
 
-        for _ in range(50):
+        for _ in range(30):
             model.train()
             for x_seq, x_meta, y_batch in train_loader:
                 x_seq, x_meta, y_batch = x_seq.to(device), x_meta.to(device), y_batch.to(device)
@@ -163,7 +162,7 @@ def objective(trial):
                 patience_counter = 0
             else:
                 patience_counter += 1
-                if patience_counter >= 8:
+                if patience_counter >= 15:
                     break
 
         fold_scores.append(best_fold_ap)
@@ -173,7 +172,7 @@ def objective(trial):
 
 
 study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=80, show_progress_bar=True)
+study.optimize(objective, n_trials=60, show_progress_bar=True)
 
 # RECORD RESULTS
 best = study.best_params
@@ -190,7 +189,7 @@ final_params = {
     "learning_rate":    round(best["learning_rate"], 6),
     "weight_decay":     round(best["weight_decay"], 8),
     "batch_size":       best["batch_size"],
-    "epochs":           100,
+    "epochs":           30,
     "patience":         15,
 }
 

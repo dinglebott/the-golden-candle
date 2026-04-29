@@ -21,7 +21,7 @@ version = env["xgb"]["use_version"]
 pattern_module = registry.load(pattern)
 
 # LOAD MODEL + CONFIGS
-with open(Path(__file__).parent / f"model_configs/v{version}/{pattern}_features.json", "r") as f:
+with open(Path(__file__).parent / f"model_configs/current_models/{pattern}_features.json", "r") as f:
     features = json.load(f)["features"]
 
 model = xgb.XGBClassifier()
