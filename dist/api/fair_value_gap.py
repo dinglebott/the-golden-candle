@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-METADATA_FEATURES = ["gap_atr_ratio", "direction"]
+METADATA_FEATURES = ["gap_atr_ratio"]
 
 
 def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:

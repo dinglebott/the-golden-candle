@@ -5,6 +5,7 @@ from pathlib import Path
 
 from api.patchtst import PatchTST
 from api.cnn_lstm import CnnLstm
+from api.symmetry import build_flip_mask, build_swap_indices, apply_flip
 
 GATE_ARTIFACTS = Path("artifacts/gate")
 
@@ -58,6 +59,8 @@ def loadModels():
         model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
         checkpoint["_model"] = model
+        checkpoint["_flip_mask"] = build_flip_mask(seq_features)
+        checkpoint["_swap_indices"] = build_swap_indices(seq_features)
         _cnnLstmModels[name] = checkpoint
 
 
@@ -71,6 +74,7 @@ def predictCnnLstm(name: str, df: pd.DataFrame, instance: dict, pred_labels: dic
 
     idx = instance["index"]
     seq = df.iloc[idx - seq_len + 1 : idx + 1][seq_features].values.astype(np.float32)
+    seq = apply_flip(seq, instance["direction"], checkpoint["_flip_mask"], checkpoint["_swap_indices"])
     seq_mean = np.array(norm["seq_mean"], dtype=np.float32).squeeze()
     seq_std  = np.array(norm["seq_std"],  dtype=np.float32).squeeze()
     seq = (seq - seq_mean) / seq_std

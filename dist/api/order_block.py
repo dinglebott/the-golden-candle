@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-METADATA_FEATURES = ["impulse_atr_ratio", "zone_size_atr_ratio", "candles_elapsed", "direction"]
+METADATA_FEATURES = ["impulse_atr_ratio", "zone_size_atr_ratio", "candles_elapsed"]
 
 IMPULSE_ATR_MULT  = 1.5  # min net move over impulse window to qualify as impulse
 IMPULSE_WINDOW    = 3    # candles over which net impulse move is measured
@@ -86,40 +86,3 @@ def detect(df: pd.DataFrame) -> list[dict]:
                 break  # first touch only; zone expires
 
     return instances
-
-
-def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int, k: float) -> list[dict]:
-    highs  = df["high"].values
-    lows   = df["low"].values
-    atrs   = df["raw_atr"].values
-    n_rows = len(df)
-
-    labelled = []
-    for inst in instances:
-        i   = inst["index"]
-        atr = atrs[i]
-
-        # SL: beyond the full OB range
-        if inst["direction"] == 1:
-            stop_level = inst["ob_low"] - k * atr
-        else:
-            stop_level = inst["ob_high"] + k * atr
-
-        label = 0
-        for j in range(i + 1, min(i + 1 + n_candles, n_rows)):
-            if inst["direction"] == 1:
-                stopped = lows[j]  <= stop_level
-                filled  = highs[j] >= inst["fill_target"]
-            else:
-                stopped = highs[j] >= stop_level
-                filled  = lows[j]  <= inst["fill_target"]
-
-            if stopped:
-                break
-            if filled:
-                label = 1
-                break
-
-        labelled.append({**inst, "label": label})
-
-    return labelled
