@@ -55,6 +55,7 @@ def loadModels():
             lstm_hidden=cfg["lstm_hidden"],
             lstm_layers=cfg["lstm_layers"],
             dropout=cfg["dropout"],
+            head_hidden=cfg.get("head_hidden"),
         )
         model.load_state_dict(checkpoint["model_state_dict"])
         model.eval()
