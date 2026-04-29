@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 
-METADATA_FEATURES = ["gap_atr_ratio", "direction"]
+METADATA_FEATURES = ["gap_atr_ratio"]
+
+SL_ATR_MULT = 1.5  # SL beyond the FVG candle's extreme as multiple of ATR
 
 
 def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:
@@ -54,7 +56,7 @@ def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:
     return instances
 
 
-def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int, k: float) -> list[dict]:
+def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int) -> list[dict]:
     highs = df["high"].values
     lows = df["low"].values
     atrs = df["raw_atr"].values
@@ -66,9 +68,9 @@ def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int, k: 
         atr = atrs[i]
 
         if inst["direction"] == 1:
-            stop_level = highs[i] + k * atr
+            stop_level = highs[i] + SL_ATR_MULT * atr
         else:
-            stop_level = lows[i] - k * atr
+            stop_level = lows[i] - SL_ATR_MULT * atr
 
         label = 0
         for j in range(i + 1, min(i + 1 + n_candles, n_rows)):

@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
 
-METADATA_FEATURES = ["impulse_atr_ratio", "zone_size_atr_ratio", "candles_elapsed", "direction"]
+METADATA_FEATURES = ["impulse_atr_ratio", "zone_size_atr_ratio", "candles_elapsed"]
 
+SL_ATR_MULT       = 0.5  # SL beyond the OB zone as multiple of ATR
 IMPULSE_ATR_MULT  = 1.5  # min net move over impulse window to qualify as impulse
 IMPULSE_WINDOW    = 3    # candles over which net impulse move is measured
 OB_EXPIRY         = 48   # candles before untouched zone expires
@@ -88,7 +89,7 @@ def detect(df: pd.DataFrame) -> list[dict]:
     return instances
 
 
-def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int, k: float) -> list[dict]:
+def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int) -> list[dict]:
     highs  = df["high"].values
     lows   = df["low"].values
     atrs   = df["raw_atr"].values
@@ -101,9 +102,9 @@ def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int, k: 
 
         # SL: beyond the full OB range
         if inst["direction"] == 1:
-            stop_level = inst["ob_low"] - k * atr
+            stop_level = inst["ob_low"] - SL_ATR_MULT * atr
         else:
-            stop_level = inst["ob_high"] + k * atr
+            stop_level = inst["ob_high"] + SL_ATR_MULT * atr
 
         label = 0
         for j in range(i + 1, min(i + 1 + n_candles, n_rows)):

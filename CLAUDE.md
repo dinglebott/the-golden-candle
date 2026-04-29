@@ -81,10 +81,10 @@ Pattern-gated approach: a hardcoded detector first filters candles matching a sp
 
 **Key `env.json` fields:**
 - `pattern` — name of the active pattern (e.g. `"fvg"`); controls which detector and labeller are used
-- `k_value` / `n_value` — SL multiplier and time-barrier length
+- `n_value` — time-barrier length (SL multiplier and other pattern-specific knobs live as module-level constants at the top of each detector in `patterns/`, not in `env.json`)
 - `train_version` / `use_version` — nested under `"xgb"` and `"cnn_lstm"` keys
 
-**Adding a new pattern:** implement `METADATA_FEATURES`, `detect(df)`, and `label_instances(df, instances, n_candles, k)` in `patterns/<name>.py`, register it in `registry.py`, set `"pattern"` in `env.json`, and add versioned feature/param configs under each model architecture's `model_configs/`.
+**Adding a new pattern:** implement `METADATA_FEATURES`, `detect(df)`, and `label_instances(df, instances, n_candles)` in `patterns/<name>.py` (SL/TP multipliers live as module-level constants at the top of the detector file), register it in `registry.py`, set `"pattern"` in `env.json`, and add versioned feature/param configs under each model architecture's `model_configs/`.
 
 **Deploying:** copy the trained model and feature list into `dist/artifacts/<pattern_name>/`, add the pattern to `PATTERN_VERSIONS` in `dist/api/inference.py`, add an entry to `PATTERN_REGISTRY` in `dist/api/main.py`, and add a `PATTERN_CONFIGS` entry in `web_interface/js/config.js`.
 

@@ -2,8 +2,8 @@ from importlib import import_module
 
 _REGISTRY = {
     "fvg": "patterns.fair_value_gap",
-    "liquidity_sweep": "patterns.liquidity_sweep",
     "order_block": "patterns.order_block",
+    "failed_breakout": "patterns.failed_breakout",
 }
 
 

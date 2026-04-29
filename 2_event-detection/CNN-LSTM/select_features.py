@@ -23,7 +23,6 @@ year_now = env["year_now"]
 instrument = env["instrument"]
 granularity = env["granularity"]
 n = env["n_value"]
-k = env["k_value"]
 train_split = env["train_split"]
 val_split = env["val_split"]
 pattern = env["pattern"]
@@ -81,7 +80,7 @@ df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now
 
 # DETECT AND LABEL
 instances = pattern_module.detect(df)
-labelled = pattern_module.label_instances(df, instances, n, k)
+labelled = pattern_module.label_instances(df, instances, n)
 print(f"Detected {len(labelled)} {pattern.upper()} instances | fill rate: {sum(i['label'] for i in labelled) / len(labelled):.2%}")
 
 # SPLIT

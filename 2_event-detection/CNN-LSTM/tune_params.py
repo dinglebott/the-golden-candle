@@ -25,7 +25,6 @@ year_now = env["year_now"]
 instrument = env["instrument"]
 granularity = env["granularity"]
 n = env["n_value"]
-k = env["k_value"]
 train_split = env["train_split"]
 val_split = env["val_split"]
 device = torch.device(env["device"] if torch.cuda.is_available() else "cpu")
@@ -49,7 +48,7 @@ df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now
 
 # DETECT AND LABEL
 instances = pattern_module.detect(df)
-labelled = pattern_module.label_instances(df, instances, n, k)
+labelled = pattern_module.label_instances(df, instances, n)
 
 # Use train + val only (no test leakage)
 val_end = int((train_split + val_split) * len(labelled))
@@ -82,13 +81,14 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 
 def objective(trial):
-    seq_len = trial.suggest_categorical("seq_len", [20, 25, 30, 35, 40, 45, 50])
+    seq_len = trial.suggest_categorical("seq_len", [30, 35, 40, 45, 50])
     conv_filters = trial.suggest_categorical("conv_filters", [32, 48, 64, 96, 128])
     conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7, 9])
     lstm_hidden = trial.suggest_categorical("lstm_hidden", [64, 96, 128, 192, 256])
     lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
-    dropout = trial.suggest_float("dropout", 0.1, 0.4)
+    dropout = trial.suggest_float("dropout", 0.05, 0.25)
     lr = trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True)
+    weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
     batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96, 128])
 
     fold_scores = []
@@ -127,7 +127,7 @@ def objective(trial):
         neg_count = len(y_tr) - pos_count
         pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32).to(device)
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         train_loader = DataLoader(EventDataset(X_tr_seq, X_tr_meta, y_tr), batch_size=batch_size, shuffle=True)
         val_loader   = DataLoader(EventDataset(X_vl_seq, X_vl_meta, y_vl), batch_size=batch_size)
@@ -188,6 +188,7 @@ final_params = {
     "lstm_layers":      best["lstm_layers"],
     "dropout":          round(best["dropout"], 6),
     "learning_rate":    round(best["learning_rate"], 6),
+    "weight_decay":     round(best["weight_decay"], 8),
     "batch_size":       best["batch_size"],
     "epochs":           100,
     "patience":         15,

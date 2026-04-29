@@ -1,12 +1,12 @@
 {
-    "seq_len": 50,
+    "seq_len": 45,
     "conv_filters": 32,
     "conv_kernel_size": 3,
-    "lstm_hidden": 256,
+    "lstm_hidden": 128,
     "lstm_layers": 1,
-    "dropout": 0.307062,
-    "learning_rate": 0.007042,
-    "batch_size": 128,
+    "dropout": 0.372461,
+    "learning_rate": 0.000985,
+    "batch_size": 96,
     "epochs": 100,
     "patience": 15
 }

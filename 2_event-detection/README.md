@@ -38,7 +38,7 @@ SL - 1.5 &times; ATR beyond the extreme of the 3rd candle\
 
 **Order block**\
 Defined as the last candle of a different colour right before a large move in the opposite direction (e.g. red candle right before 3 large green candles). Similar concept to a fair value gap, but on a larger scale. The first candle to close back inside the order block range within the next 48 hours is the detection candle. If a candle closes beyond the order block, that order block is invalidated. The expected resolution is that the market rebounds again in the same direction as last time.\
-TP - 1 &times; ATR from the close price of the detection candle\
+TP - 1.0 &times; ATR from the close price of the detection candle\
 SL - 0.5 &times; ATR beyond the further end of the order block (below the order block low for a bullish OB and vice versa)\
 <br/>
 
@@ -48,7 +48,7 @@ SL - 0.5 &times; ATR beyond the further end of the order block (below the order 
 1. Create `patterns/<pattern_name>.py` implementing three things:
    - `METADATA_FEATURES` — information about the pattern that exist only at the detection candle (e.g. direction). These are injected into the event row and fed directly to the model head, not into the sequence.
    - `detect(df)` — scans the DataFrame and returns a list of instance dicts. Each dict must include `index`, `time`, and one key per `METADATA_FEATURES` entry, plus any fields needed by `label_instances`.
-   - `label_instances(df, instances, n_candles, k)` — applies triple-barrier labelling and appends `"label": 0 or 1` to each instance dict. Labels must be `1` for "fill" and `0` for "no fill".
+   - `label_instances(df, instances, n_candles)` — applies triple-barrier labelling and appends `"label": 0 or 1` to each instance dict. Labels must be `1` for "fill" and `0` for "no fill". The SL multiplier (and any other pattern-specific knobs like TP) live as module-level constants at the top of the detector file, not in `env.json`.
 2. Register the pattern in `patterns/registry.py` by adding an entry to `_REGISTRY`.
 3. Set `"pattern": "<pattern_name>"` in `env.json`.
 4. For each model architecture you want to train, create a versioned config folder (`model_configs/v1/`) containing:
@@ -57,7 +57,6 @@ SL - 0.5 &times; ATR beyond the further end of the order block (below the order 
 
 ### Training
 First, set the correct config variables in `env.json`. Below are the variables that may need some clarification:
-- `k_value` - Coefficient to multiply ATR(14) by, determines stop loss
 - `n_value` - Length of time barrier from pattern emergence, expressed in candles
 - `train_split`, `val_split` - Determines split ratio of the dataset (test set is whatever is left over)
 - `pattern` - Determines the training task for the models
