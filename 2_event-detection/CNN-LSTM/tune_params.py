@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data_processing import dataparser
 from patterns import registry
-from symmetry import build_flip_mask, build_swap_indices, apply_flip
+from symmetry import build_flip_mask, build_swap_indices, build_offset_indices, apply_flip
 from classes import EventDataset, CnnLstm
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -56,6 +56,7 @@ instances_tuning = labelled[:val_end]
 
 flip_mask = build_flip_mask(seq_features)
 swap_indices = build_swap_indices(seq_features)
+offset_indices = build_offset_indices(seq_features)
 
 def build_sequences(df, instances, seq_len, seq_features, meta_features):
     X_seq, X_meta, y = [], [], []
@@ -64,7 +65,7 @@ def build_sequences(df, instances, seq_len, seq_features, meta_features):
         if idx < seq_len - 1:
             continue
         seq = df.iloc[idx - seq_len + 1 : idx + 1][seq_features].values.astype(np.float32)
-        seq = apply_flip(seq, inst["direction"], flip_mask, swap_indices)
+        seq = apply_flip(seq, inst["direction"], flip_mask, swap_indices, offset_indices)
         meta = np.array([inst[f] for f in meta_features], dtype=np.float32)
         X_seq.append(seq)
         X_meta.append(meta)
