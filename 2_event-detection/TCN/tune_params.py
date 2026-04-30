@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from data_processing import dataparser
 from patterns import registry
 from symmetry import build_flip_mask, build_swap_indices, build_offset_indices, apply_flip
-from classes import EventDataset, CnnLstm
+from classes import EventDataset, Tcn
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -82,10 +82,9 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 def objective(trial):
     seq_len = trial.suggest_categorical("seq_len", [20, 25, 30, 35])
-    conv_filters = trial.suggest_categorical("conv_filters", [16, 24, 32, 48])
-    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7])
-    lstm_hidden = trial.suggest_categorical("lstm_hidden", [24, 32, 48, 64, 96])
-    lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
+    channels = trial.suggest_categorical("channels", [16, 24, 32, 48, 64])
+    kernel_size = trial.suggest_categorical("kernel_size", [2, 3, 5, 7])
+    n_levels = trial.suggest_int("n_levels", 2, 5)
     head_hidden = trial.suggest_categorical("head_hidden", [None, 16, 24, 32, 48, 64])
     dropout = trial.suggest_float("dropout", 0.1, 0.5)
     lr = trial.suggest_float("learning_rate", 5e-4, 7e-3)
@@ -114,13 +113,12 @@ def objective(trial):
         X_tr_meta = (X_tr_meta - meta_mean) / meta_std
         X_vl_meta = (X_vl_meta - meta_mean) / meta_std
 
-        model = CnnLstm(
+        model = Tcn(
             n_seq_features=len(seq_features),
             n_meta_features=len(meta_features),
-            conv_filters=conv_filters,
-            conv_kernel_size=conv_kernel,
-            lstm_hidden=lstm_hidden,
-            lstm_layers=lstm_layers,
+            channels=channels,
+            kernel_size=kernel_size,
+            n_levels=n_levels,
             dropout=dropout,
             head_hidden=head_hidden,
         ).to(device)
@@ -168,7 +166,7 @@ def objective(trial):
                 patience_counter += 1
                 if patience_counter >= 7:
                     break
-        
+
         # return mean of top 3 epochs
         fold_scores.append(float(np.mean(sorted(val_aps)[-3:])) if val_aps else 0.0)
         torch.cuda.empty_cache()
@@ -185,18 +183,17 @@ print("\nBest hyperparameters:")
 print(pd.Series(best))
 
 final_params = {
-    "seq_len":          best["seq_len"],
-    "conv_filters":     best["conv_filters"],
-    "conv_kernel_size": best["conv_kernel_size"],
-    "lstm_hidden":      best["lstm_hidden"],
-    "lstm_layers":      best["lstm_layers"],
-    "head_hidden":      best["head_hidden"],
-    "dropout":          round(best["dropout"], 6),
-    "learning_rate":    round(best["learning_rate"], 6),
-    "weight_decay":     round(best["weight_decay"], 8),
-    "batch_size":       best["batch_size"],
-    "epochs":           40,
-    "patience":         15,
+    "seq_len":       best["seq_len"],
+    "channels":      best["channels"],
+    "kernel_size":   best["kernel_size"],
+    "n_levels":      best["n_levels"],
+    "head_hidden":   best["head_hidden"],
+    "dropout":       round(best["dropout"], 6),
+    "learning_rate": round(best["learning_rate"], 6),
+    "weight_decay":  round(best["weight_decay"], 8),
+    "batch_size":    best["batch_size"],
+    "epochs":        40,
+    "patience":      15,
 }
 
 (Path(__file__).parent / "results").mkdir(exist_ok=True)

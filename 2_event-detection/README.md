@@ -18,7 +18,7 @@ At the experiment root is an `env.json` for config - see below for details.\
 `registry.py` is an index of all patterns, and it imports the relevant pattern detection file automatically based on `env.json`.\y
 <br/>
 
-Each model architecture has its own folder: XGBoost, CNN-LSTM, PatchTST. Within each folder:\
+Each model architecture has its own folder: XGBoost, CNN-LSTM, TCN. Within each folder:\
 `select_features.py` - Feature selection tool\
 `tune_params.py` - Hyperparameter tuning (Optuna)\
 `results/` - Output location for feature selection, hyperparameter tuning, model test metrics\
