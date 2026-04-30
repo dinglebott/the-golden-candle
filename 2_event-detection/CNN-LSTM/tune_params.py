@@ -88,8 +88,8 @@ def objective(trial):
     lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
     head_hidden = trial.suggest_categorical("head_hidden", [None, 16, 24, 32, 48, 64])
     dropout = trial.suggest_float("dropout", 0.1, 0.5)
-    lr = trial.suggest_float("learning_rate", 5e-4, 7e-3)
-    weight_decay = trial.suggest_float("weight_decay", 5e-4, 7e-3)
+    lr = trial.suggest_float("learning_rate", 1e-4, 7e-3, log=True)
+    weight_decay = trial.suggest_float("weight_decay", 1e-4, 7e-3, log=True)
     batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96])
 
     fold_scores = []
