@@ -12,13 +12,13 @@
   "icons": [
     {
       "src": "assets/maskable.png",
-      "sizes": "1920x1920",
+      "sizes": "2480x2480",
       "type": "image/png",
       "purpose": "any"
     },
     {
       "src": "assets/maskable.png",
-      "sizes": "1920x1920",
+      "sizes": "2480x2480",
       "type": "image/png",
       "purpose": "maskable"
     }
