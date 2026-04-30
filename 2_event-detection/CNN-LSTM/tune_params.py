@@ -84,12 +84,12 @@ def objective(trial):
     seq_len = trial.suggest_categorical("seq_len", [20, 25, 30, 35])
     conv_filters = trial.suggest_categorical("conv_filters", [16, 24, 32, 48])
     conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7])
-    lstm_hidden = trial.suggest_categorical("lstm_hidden", [24, 32, 48, 64, 96])
-    lstm_layers = trial.suggest_categorical("lstm_layers", [1, 2])
-    head_hidden = trial.suggest_categorical("head_hidden", [None, 16, 24, 32, 48, 64])
+    lstm_hidden = trial.suggest_categorical("lstm_hidden", [48, 64, 96])
+    lstm_layers = trial.suggest_categorical("lstm_layers", [2])
+    head_hidden = trial.suggest_categorical("head_hidden", [24, 32, 48, 64]) # None for linear head
     dropout = trial.suggest_float("dropout", 0.1, 0.5)
-    lr = trial.suggest_float("learning_rate", 1e-4, 7e-3, log=True)
-    weight_decay = trial.suggest_float("weight_decay", 1e-4, 7e-3, log=True)
+    lr = trial.suggest_float("learning_rate", 5e-4, 6e-3)
+    weight_decay = trial.suggest_float("weight_decay", 5e-4, 6e-3)
     batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96])
 
     fold_scores = []
