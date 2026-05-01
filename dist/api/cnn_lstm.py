@@ -17,13 +17,16 @@ class EventDataset(Dataset):
 
 
 class CnnLstm(nn.Module):
-    def __init__(self, n_seq_features, n_meta_features, conv_filters, conv_kernel_size, lstm_hidden, lstm_layers, dropout):
+    def __init__(self, n_seq_features, n_meta_features, conv_filters, conv_kernel_size, lstm_hidden, lstm_layers, dropout, head_hidden=None):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv1d(n_seq_features, conv_filters, conv_kernel_size, padding=conv_kernel_size // 2),
+            nn.BatchNorm1d(conv_filters),
             nn.ReLU(),
+            nn.MaxPool1d(2),
             nn.Dropout(dropout),
             nn.Conv1d(conv_filters, conv_filters, conv_kernel_size, padding=conv_kernel_size // 2),
+            nn.BatchNorm1d(conv_filters),
             nn.ReLU(),
             nn.Dropout(dropout),
         )
@@ -32,12 +35,15 @@ class CnnLstm(nn.Module):
             batch_first=True,
             dropout=dropout if lstm_layers > 1 else 0.0,
         )
-        self.head = nn.Sequential(
-            nn.Linear(lstm_hidden + n_meta_features, 64),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(64, 1),
-        )
+        if head_hidden is None:
+            self.head = nn.Linear(lstm_hidden + n_meta_features, 1)
+        else:
+            self.head = nn.Sequential(
+                nn.Linear(lstm_hidden + n_meta_features, head_hidden),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(head_hidden, 1),
+            )
 
     def forward(self, x_seq, x_meta):
         x = x_seq.permute(0, 2, 1)
