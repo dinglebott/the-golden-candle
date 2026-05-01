@@ -48,7 +48,7 @@ const PATTERN_CONFIGS = [
             });
             metaEl.innerHTML = `
                 <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
-                <span class="pattern-gap">Gap: ${formatPrice(meta.gap_low)} - ${formatPrice(meta.gap_high)}</span>
+                <span class="pattern-gap">${formatPrice(meta.gap_low)} - ${formatPrice(meta.gap_high)}</span>
                 <span class="pattern-time">@ ${timeStr} SGT</span>
             `;
         }
@@ -79,7 +79,7 @@ const PATTERN_CONFIGS = [
             const timeStr = fmt(dt);
             metaEl.innerHTML = `
                 <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
-                <span class="pattern-gap">OB: ${obTimeStr} SGT</span>
+                <span class="pattern-gap">${obTimeStr}</span>
                 <span class="pattern-time">@ ${timeStr} SGT</span>
             `;
         }
