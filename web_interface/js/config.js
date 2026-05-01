@@ -48,8 +48,8 @@ const PATTERN_CONFIGS = [
             });
             metaEl.innerHTML = `
                 <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
-                <span class="pattern-gap">${formatPrice(meta.gap_low)} – ${formatPrice(meta.gap_high)}</span>
-                <span class="pattern-time">${timeStr} SGT</span>
+                <span class="pattern-gap">Gap: ${formatPrice(meta.gap_low)} - ${formatPrice(meta.gap_high)}</span>
+                <span class="pattern-time">@ ${timeStr} SGT</span>
             `;
         }
     },
@@ -68,13 +68,19 @@ const PATTERN_CONFIGS = [
                 hour: "2-digit", minute: "2-digit", hour12: false,
                 timeZone: "Asia/Singapore"
             });
+            // timestamp of OB candle itself
             const obStart = new Date(meta.ob_time);
             const obEnd = new Date(meta.ob_time);
             obEnd.setUTCHours(obEnd.getUTCHours() + 1);
-            const timeStr = `${fmt(obStart)} – ${fmt(obEnd)}`;
+            const obTimeStr = `${fmt(obStart)} - ${fmt(obEnd)}`;
+            // detection_time is the open of candle i; +1h gives the start of the fill window
+            const dt = new Date(meta.detection_time);
+            dt.setUTCHours(dt.getUTCHours() + 1);
+            const timeStr = fmt(dt);
             metaEl.innerHTML = `
                 <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
-                <span class="pattern-time">${timeStr} SGT</span>
+                <span class="pattern-gap">OB: ${obTimeStr} SGT</span>
+                <span class="pattern-time">@ ${timeStr} SGT</span>
             `;
         }
     },
