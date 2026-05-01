@@ -11,7 +11,7 @@ import api.fair_value_gap as fvg_detector
 import api.order_block as order_block_detector
 
 logger = logging.getLogger(__name__)
-GATE_ARTIFACTS = Path("artifacts/gate")
+ARTIFACTS = Path("artifacts")
 N_VALUE = 6
 
 # Registry for pattern endpoints. To add a new pattern:
@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Golden Candle API",
-    version="1.4",
+    version="2.0",
     lifespan=lifespan
 )
 
@@ -82,10 +82,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-assert (GATE_ARTIFACTS / f"PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt").exists(), \
+assert (ARTIFACTS / f"gate_PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt").exists(), \
     f"PatchTST gate model not found for version {patchTstGateVersion}"
 for _name, _version in PATTERN_VERSIONS.items():
-    assert (Path(f"artifacts/{_name}") / f"CNN-LSTM_EUR_USD_H1_2026_v{_version}.pt").exists(), \
+    assert (ARTIFACTS / f"{_name}_CNN-LSTM_EUR_USD_H1_2026_v{_version}.pt").exists(), \
         f"CNN-LSTM {_name} model not found for version {_version}"
 
 

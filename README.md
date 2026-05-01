@@ -44,6 +44,10 @@ This experiment filters out specific patterns using hardcoded criteria, then pre
 
 
 ## DEPLOYMENT CHANGELOG
+### 2.0
+- Implemented label smoothing and symmetrised features
+- Added FVG CNN-LSTM v3
+- Added order block CNN-LSTM v2
 ### 1.4
 - Added order block CNN-LSTM v1
 ### 1.3

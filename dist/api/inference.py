@@ -5,16 +5,16 @@ from pathlib import Path
 
 from api.patchtst import PatchTST
 from api.cnn_lstm import CnnLstm
-from api.symmetry import build_flip_mask, build_swap_indices, apply_flip
+from api.symmetry import build_flip_mask, build_swap_indices, build_offset_indices, apply_flip
 
-GATE_ARTIFACTS = Path("artifacts/gate")
+ARTIFACTS = Path("artifacts")
 
 patchTstGateVersion = 1
 
 # Add new pattern names and their model versions here when deploying a new pattern model.
 PATTERN_VERSIONS: dict[str, int] = {
-    "fvg": 2,
-    "order_block": 1
+    "fvg": 3,
+    "order_block": 2
 }
 
 _patchTstGateModel = None
@@ -26,7 +26,7 @@ def loadModels():
     global _patchTstGateModel, _patchTstGateCheckpoint
 
     checkpoint = torch.load(
-        GATE_ARTIFACTS / f"PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt",
+        ARTIFACTS / f"gate_PatchTST_EUR_USD_H1_2026_v{patchTstGateVersion}.pt",
         map_location="cpu",
         weights_only=False,
     )
@@ -40,7 +40,7 @@ def loadModels():
 
     for name, version in PATTERN_VERSIONS.items():
         checkpoint = torch.load(
-            Path(f"artifacts/{name}") / f"CNN-LSTM_EUR_USD_H1_2026_v{version}.pt",
+            ARTIFACTS / f"{name}_CNN-LSTM_EUR_USD_H1_2026_v{version}.pt",
             map_location="cpu",
             weights_only=False,
         )
@@ -62,6 +62,7 @@ def loadModels():
         checkpoint["_model"] = model
         checkpoint["_flip_mask"] = build_flip_mask(seq_features)
         checkpoint["_swap_indices"] = build_swap_indices(seq_features)
+        checkpoint["_offset_indices"] = build_offset_indices(seq_features)
         _cnnLstmModels[name] = checkpoint
 
 
@@ -75,7 +76,7 @@ def predictCnnLstm(name: str, df: pd.DataFrame, instance: dict, pred_labels: dic
 
     idx = instance["index"]
     seq = df.iloc[idx - seq_len + 1 : idx + 1][seq_features].values.astype(np.float32)
-    seq = apply_flip(seq, instance["direction"], checkpoint["_flip_mask"], checkpoint["_swap_indices"])
+    seq = apply_flip(seq, instance["direction"], checkpoint["_flip_mask"], checkpoint["_swap_indices"], checkpoint["_offset_indices"])
     seq_mean = np.array(norm["seq_mean"], dtype=np.float32).squeeze()
     seq_std  = np.array(norm["seq_std"],  dtype=np.float32).squeeze()
     seq = (seq - seq_mean) / seq_std
