@@ -82,15 +82,15 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 def objective(trial):
     seq_len = trial.suggest_categorical("seq_len", [20, 25, 30, 35])
-    conv_filters = trial.suggest_categorical("conv_filters", [16, 24, 32, 48])
-    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7])
-    lstm_hidden = trial.suggest_categorical("lstm_hidden", [48, 64, 96])
-    lstm_layers = trial.suggest_categorical("lstm_layers", [2])
-    head_hidden = trial.suggest_categorical("head_hidden", [24, 32, 48, 64]) # None for linear head
-    dropout = trial.suggest_float("dropout", 0.1, 0.5)
-    lr = trial.suggest_float("learning_rate", 5e-4, 6e-3)
-    weight_decay = trial.suggest_float("weight_decay", 5e-4, 6e-3)
-    batch_size = trial.suggest_categorical("batch_size", [32, 48, 64, 96])
+    conv_filters = trial.suggest_categorical("conv_filters", [16, 24, 32])
+    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7, 9])
+    lstm_hidden = trial.suggest_categorical("lstm_hidden", [16, 24, 48, 64])
+    lstm_layers = trial.suggest_categorical("lstm_layers", [1])
+    head_hidden = trial.suggest_categorical("head_hidden", [None, 16, 24, 32, 48]) # None for linear head
+    dropout = trial.suggest_float("dropout", 0.2, 0.5)
+    lr = trial.suggest_float("learning_rate", 1e-5, 1e-4)
+    weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-4)
+    batch_size = trial.suggest_categorical("batch_size", [48, 64, 96, 128, 196])
 
     fold_scores = []
     for train_idxs, val_idxs in cross_val_splits(len(instances_tuning), 4, 0.1):
@@ -130,7 +130,9 @@ def objective(trial):
         pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32).to(device)
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30, eta_min=1e-6)
+        warmup    = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.05, end_factor=1.0, total_iters=5)
+        cosine    = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=45, eta_min=1e-6)
+        scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[5])
 
         train_loader = DataLoader(EventDataset(X_tr_seq, X_tr_meta, y_tr), batch_size=batch_size, shuffle=True, drop_last=True)
         val_loader   = DataLoader(EventDataset(X_vl_seq, X_vl_meta, y_vl), batch_size=batch_size)
@@ -139,12 +141,12 @@ def objective(trial):
         best_val_ap = -1.0
         patience_counter = 0
 
-        for _ in range(40):
+        for _ in range(50):
             model.train()
             for x_seq, x_meta, y_batch in train_loader:
                 x_seq, x_meta, y_batch = x_seq.to(device), x_meta.to(device), y_batch.to(device)
                 optimizer.zero_grad()
-                loss = criterion(model(x_seq, x_meta), y_batch)
+                loss = criterion(model(x_seq, x_meta), y_batch.float() * 0.9 + 0.05) # label smoothing
                 loss.backward()
                 optimizer.step()
 
@@ -166,11 +168,11 @@ def objective(trial):
                 patience_counter = 0
             else:
                 patience_counter += 1
-                if patience_counter >= 7:
+                if patience_counter >= 5:
                     break
         
-        # return mean of top 3 epochs
-        fold_scores.append(float(np.mean(sorted(val_aps)[-3:])) if val_aps else 0.0)
+        # last-8-epoch mean penalises early spikes that then collapse
+        fold_scores.append(float(np.mean(val_aps[-8:])) if val_aps else 0.0)
         torch.cuda.empty_cache()
 
     return np.mean(fold_scores) if fold_scores else 0.0
@@ -195,7 +197,7 @@ final_params = {
     "learning_rate":    round(best["learning_rate"], 6),
     "weight_decay":     round(best["weight_decay"], 8),
     "batch_size":       best["batch_size"],
-    "epochs":           40,
+    "epochs":           50,
     "patience":         15,
 }
 

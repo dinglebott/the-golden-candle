@@ -129,7 +129,9 @@ neg_count = len(y_train) - pos_count
 pos_weight = torch.tensor([neg_count / pos_count], dtype=torch.float32).to(device)
 criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 optimizer = torch.optim.AdamW(model.parameters(), lr=params["learning_rate"], weight_decay=params.get("weight_decay", 0.0))
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=params["epochs"], eta_min=1e-6)
+warmup    = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.05, end_factor=1.0, total_iters=5)
+cosine    = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=params["epochs"] - 5, eta_min=1e-6)
+scheduler = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[5])
 
 batch_size = params["batch_size"]
 train_loader = DataLoader(EventDataset(X_train_seq, X_train_meta, y_train), batch_size=batch_size, shuffle=True, drop_last=True)
@@ -144,7 +146,7 @@ for epoch in range(1, params["epochs"] + 1):
     for x_seq, x_meta, y_batch in train_loader:
         x_seq, x_meta, y_batch = x_seq.to(device), x_meta.to(device), y_batch.to(device)
         optimizer.zero_grad()
-        loss = criterion(model(x_seq, x_meta), y_batch)
+        loss = criterion(model(x_seq, x_meta), y_batch.float() * 0.9 + 0.05) # label smoothing
         loss.backward()
         optimizer.step()
 
