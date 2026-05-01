@@ -75,6 +75,7 @@ def detect(df: pd.DataFrame) -> list[dict]:
                 instances.append({
                     "index":               j,
                     "time":                times[j],
+                    "ob_time":             zone["ob_time"],
                     "direction":           direction,
                     "ob_high":             ob_high,
                     "ob_low":              ob_low,

@@ -64,16 +64,16 @@ const PATTERN_CONFIGS = [
         },
         renderMeta(metaEl, meta) {
             const dirColor = meta.direction === "bullish" ? "#4ade80" : "#f87171";
-            // detection_time is the open of candle i; +1h gives the start of the fill window
-            const dt = new Date(meta.detection_time);
-            dt.setUTCHours(dt.getUTCHours() + 1);
-            const timeStr = dt.toLocaleString("en-SG", {
+            const fmt = (d) => d.toLocaleString("en-SG", {
                 hour: "2-digit", minute: "2-digit", hour12: false,
                 timeZone: "Asia/Singapore"
             });
+            const obStart = new Date(meta.ob_time);
+            const obEnd = new Date(meta.ob_time);
+            obEnd.setUTCHours(obEnd.getUTCHours() + 1);
+            const timeStr = `${fmt(obStart)} – ${fmt(obEnd)}`;
             metaEl.innerHTML = `
                 <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
-                <span class="pattern-gap">${formatPrice(meta.ob_low)} – ${formatPrice(meta.ob_high)}</span>
                 <span class="pattern-time">${timeStr} SGT</span>
             `;
         }

@@ -46,8 +46,7 @@ PATTERN_REGISTRY: dict[str, dict] = {
         "pred_labels": {0: "NO FILL", 1: "FILL"},
         "get_meta": lambda inst: {
             "direction": "bullish" if inst["direction"] == 1 else "bearish",
-            "ob_high": inst["ob_high"],
-            "ob_low": inst["ob_low"],
+            "ob_time": str(inst["ob_time"]),
             "impulse_atr_ratio": inst["impulse_atr_ratio"],
             "zone_size_atr_ratio": inst["zone_size_atr_ratio"],
             "candles_elapsed": inst["candles_elapsed"],
