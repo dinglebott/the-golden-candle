@@ -139,6 +139,7 @@ def parseData(jsonData):
     df["dist_smooth14"] = np.log(df["close"] / ultSmoother(df["close"], 14))
     df["dist_smooth35"] = np.log(df["close"] / ultSmoother(df["close"], 35))
     df["smooth_cross"] = np.log(ultSmoother(df["close"], 8) / ultSmoother(df["close"], 18))
+    df["smooth_cross_v2"] = np.log(ultSmoother(df["close"], 20) / ultSmoother(df["close"], 70))
     
     # RSI
     def rsi(series, n=14):
