@@ -14,11 +14,12 @@ with open(Path(__file__).parent / "env.json") as f:
 INSTRUMENT = env["instrument"]
 GRANULARITY = env["granularity"]
 INDICATOR = env["indicator"]
-K = env["indicators"][INDICATOR]["k"]
+K_TP = env["indicators"][INDICATOR]["k_tp"]
+K_SL = env["indicators"][INDICATOR]["k_sl"]
 N = env["indicators"][INDICATOR]["n"]
 
 
-def triple_barrier_label(df: pd.DataFrame, signal_idx: int, k: float, n: int) -> int:
+def triple_barrier_label(df: pd.DataFrame, signal_idx: int, k_tp: float, k_sl: float, n: int) -> int:
     """
     Returns 1 if TP hit first, -1 if SL hit first, 0 if time barrier expires.
     Signal direction determines which barrier is TP and which is SL.
@@ -29,15 +30,20 @@ def triple_barrier_label(df: pd.DataFrame, signal_idx: int, k: float, n: int) ->
     atr = df["raw_atr"].to_numpy()
 
     direction = df["signal"].iloc[signal_idx]
-    barrier = k * atr[signal_idx]
-    upper = close[signal_idx] + barrier
-    lower = close[signal_idx] - barrier
+    tp_dist = k_tp * atr[signal_idx]
+    sl_dist = k_sl * atr[signal_idx]
+    if direction == 1:
+        upper = close[signal_idx] + tp_dist
+        lower = close[signal_idx] - sl_dist
+    else:
+        upper = close[signal_idx] + sl_dist
+        lower = close[signal_idx] - tp_dist
 
     for j in range(signal_idx + 1, min(signal_idx + 1 + n, len(df))):
         hit_up = high[j] >= upper
         hit_dn = low[j] <= lower
         if hit_up and hit_dn:
-            # ambiguous same-candle hit — call it a loss
+            # ambiguous same-candle hit - call it a loss
             return -1
         if hit_up:
             return 1 if direction == 1 else -1
@@ -47,7 +53,7 @@ def triple_barrier_label(df: pd.DataFrame, signal_idx: int, k: float, n: int) ->
     return 0  # time barrier
 
 
-def run_backtest(df: pd.DataFrame, signals: pd.Series, k: float, n: int) -> pd.DataFrame:
+def run_backtest(df: pd.DataFrame, signals: pd.Series, k_tp: float, k_sl: float, n: int) -> pd.DataFrame:
     df = df.copy()
     signals = signals.reindex(df.index).fillna(0).astype(int)
     df["signal"] = signals
@@ -59,7 +65,7 @@ def run_backtest(df: pd.DataFrame, signals: pd.Series, k: float, n: int) -> pd.D
         idx = df.index.get_loc(ts)
         if idx + n >= len(df):
             continue  # not enough bars remaining for a full window
-        outcome = triple_barrier_label(df, idx, k, n)
+        outcome = triple_barrier_label(df, idx, k_tp, k_sl, n)
         results.append({
             "timestamp": ts,
             "signal": row["signal"],
@@ -90,7 +96,7 @@ def print_summary(results: pd.DataFrame):
     print(f"\n{'='*40}")
     print(f"Indicator: {INDICATOR}")
     print(f"Instrument: {INSTRUMENT} {GRANULARITY}")
-    print(f"Barriers: k={K}, n={N}")
+    print(f"Barriers: k_tp={K_TP}, k_sl={K_SL}, n={N}")
     print(f"{'='*40}")
     print(f"Total signals: {total}")
     print(f"  Long signals: {len(longs)}")
@@ -110,11 +116,12 @@ def print_summary(results: pd.DataFrame):
 
 if __name__ == "__main__":
     print(f"Loading data for {INSTRUMENT} {GRANULARITY}...")
-    df = parseData(INSTRUMENT, GRANULARITY)
+    filepath = Path(__file__).parent.parent / f"raw_data/{INSTRUMENT}_{GRANULARITY}_2005-01-01_2026-04-01.json"
+    df = parseData(filepath)
 
     print(f"Computing signals from {INDICATOR}...")
     module = importlib.import_module(INDICATOR)
     signals = module.get_signals(df)
 
-    results = run_backtest(df, signals, K, N)
+    results = run_backtest(df, signals, K_TP, K_SL, N)
     print_summary(results)

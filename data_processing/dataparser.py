@@ -160,7 +160,7 @@ def parseData(jsonData):
         df[f"close_lag{lag}"] = df["close_return"].shift(lag)
         df[f"vol_lag{lag}"] = df["vol_return"].shift(lag)
 
-    # Williams %R
+    # Williams %R (rebased -50 to 50)
     fastHighest = df["high"].rolling(21).max()
     fastLowest = df["low"].rolling(21).min()
     slowHighest = df["high"].rolling(112).max()
