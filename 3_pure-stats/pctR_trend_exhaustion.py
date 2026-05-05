@@ -2,7 +2,7 @@ import pandas as pd
 
 THRESHOLD = 20 # width of the OB/OS zone
 FAST_PERIOD = 21
-SLOW_PERIOD = 140
+SLOW_PERIOD = 112
 
 def get_signals(df: pd.DataFrame):
     workingDf = pd.DataFrame()

@@ -53,6 +53,23 @@ def triple_barrier_label(df: pd.DataFrame, signal_idx: int, k_tp: float, k_sl: f
     return 0  # time barrier
 
 
+def simpleLabel(df: pd.DataFrame, signal_idx: int, k: float, n: int):
+    """
+    Labels based on final distance from close price in terms of ATR.
+    """
+    close = df["close"].to_numpy()
+    atr = df["raw_atr"].to_numpy()
+
+    direction = df["signal"].iloc[signal_idx]
+    threshold = k * atr[signal_idx]
+    if close[signal_idx + n] > close[signal_idx] + threshold:
+        return 1 if direction == 1 else -1
+    elif close[signal_idx + n] < close[signal_idx] - threshold:
+        return -1 if direction == 1 else 1
+    else:
+        return 0
+
+
 def run_backtest(df: pd.DataFrame, signals: pd.Series, k_tp: float, k_sl: float, n: int) -> pd.DataFrame:
     df = df.copy()
     signals = signals.reindex(df.index).fillna(0).astype(int)
