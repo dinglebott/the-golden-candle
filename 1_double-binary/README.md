@@ -4,10 +4,14 @@ With this approach, I divide the problem into 2 binary classifications. Firstly,
 
 
 ## METHODOLOGY
+### Training & testing
+The dataset (2005 - 2026) is split into training, validation, and test sets, at a ratio of 8:1:1. Models are trained with patterns filtered from the training set, with the validation set as a metric for early stopping. Final results are computed on the test set.\
+Training parameters (features, hyperparameters) are tuned with the aid of specialised scripts (see USAGE below). All test results are logged in the `results/` folder in each architecture directory.
+
 ### Labelling
 The target variable is determined by triple-barrier labelling (Marcos López de Prado, 2018). Given parameters *k* and *n*, three barriers are set relative to the close price **C** of the latest candle - upper, lower, and time barrier. The upper and lower barriers are set *k* &times; ATR above and below **C**, and the time barrier is set *n* candles after the latest one. Labels are then computed based on which barrier is hit first.
 
-### Feature Engineering
+### Feature engineering
 <br/>
 
 

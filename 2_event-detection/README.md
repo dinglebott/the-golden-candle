@@ -4,11 +4,15 @@ Here I take a 2-step approach. First, use hardcoded numerical criteria to filter
 
 
 ## METHODOLOGY
+### Training & testing
+The dataset (2005 - 2026) is split into training, validation, and test sets, at a ratio of 8:1:1. Models are trained with patterns filtered from the training set, with the validation set as a metric for early stopping. Final results are computed on the test set.\
+Training parameters (features, hyperparameters) are tuned with the aid of specialised scripts (see USAGE below). All test results are logged in the `results/` folder in each architecture directory.
+
 ### Labelling
 The target variable is determined by triple-barrier labelling (Marcos López de Prado, 2018). Given parameters *k* and *n*, three barriers are set relative to some reference point (depending on pattern) - stop loss, take profit, and time barrier. The SL barrier is set *k* &times; ATR below/above the reference point (for bullish/bearish setups respectively). The TP barrier is set according to the expected resolution of the setup. The time barrier is set *n* candles after the pattern emerges. Labels are then computed based on which barrier is hit first.\
 A "fill" is only labelled if price hits the TP barrier before any other barrier. Hitting both SL and TP in the same candle results in a "no fill", as does hitting the time barrier.
 
-### Feature Engineering
+### Feature engineering
 <br/>
 
 
