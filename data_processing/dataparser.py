@@ -92,6 +92,19 @@ def parseData(jsonData, candles_per_day=24):
     df["raw_atr"] = trueRange.ewm(alpha=1/14, adjust=False).mean()
     df["atr_14"] = df["raw_atr"] / df["close"]
     df["volatility_regime"] = df["atr_14"] / df["atr_14"].rolling(_w(50)).mean()
+
+    # Daily ATR — aggregate intraday candles to daily OHLC, compute ATR14 on daily bars,
+    # then map each candle to its day's value
+    _date = pd.to_datetime(df["time"]).dt.date
+    _daily = df.groupby(_date).agg(h=("high", "max"), l=("low", "min"), c=("close", "last"))
+    _daily_prev_c = _daily["c"].shift(1)
+    _daily_tr = pd.concat([
+        _daily["h"] - _daily["l"],
+        (_daily["h"] - _daily_prev_c).abs(),
+        (_daily["l"] - _daily_prev_c).abs(),
+    ], axis=1).max(axis=1)
+    _daily_atr = _daily_tr.ewm(alpha=1/14, adjust=False).mean()
+    df["daily_atr"] = _date.map(_daily_atr)
     
     # Bollinger bands
     bb_mid = df["close"].rolling(_w(20)).mean()
@@ -110,6 +123,14 @@ def parseData(jsonData, candles_per_day=24):
     df["dist_ema15"] = np.log(df["close"] / getEma(15))
     df["dist_ema50"] = np.log(df["close"] / getEma(50))
     df["ema_cross"] = np.log(getEma(12) / getEma(26))
+    # Hourly EMA20 minus EMA50, resampled from whatever granularity is provided.
+    # Shifted by one hourly bar so each candle only sees the previous completed hour (no lookahead).
+    _h_close = pd.Series(df["close"].values, index=_dt).resample("1h").last().dropna()
+    _h_ema_diff = (
+        _h_close.ewm(span=20, adjust=False).mean()
+        - _h_close.ewm(span=50, adjust=False).mean()
+    ).shift(1)
+    df["h_ema_trend"] = _h_ema_diff.reindex(_dt, method="ffill").values / df["close"]
     
     # Smoother EMA replacements
     df["dist_smooth14"] = np.log(df["close"] / ultSmoother(df["close"], 14))
