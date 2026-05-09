@@ -41,7 +41,8 @@ print("Hyperparameters:", best_params)
 
 # LOAD AND PARSE DATA
 _raw_data_dir = Path(__file__).parent.parent.parent / "raw_data"
-df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now - 21}-01-01_{year_now}-04-01.json")
+_candles_per_day = {"M5": 288, "H1": 24}
+df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now - 21}-01-01_{year_now}-04-01.json", _candles_per_day[granularity])
 
 # FILTER AND SPLIT DATA
 instances = pattern_module.detect(df)
@@ -68,8 +69,10 @@ X_val, y_val = df_val[best_features], df_val["target"]
 X_test, y_test = df_test[best_features], df_test["target"]
 
 # TRAIN MODEL
+pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
 model = xgb.XGBClassifier(
     **best_params,
+    scale_pos_weight=pos_weight,
     n_estimators=1000,
     early_stopping_rounds=50,
     random_state=42,

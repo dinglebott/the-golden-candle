@@ -38,7 +38,8 @@ print(f"Tuning on {len(features)} features: {features}")
 
 # LOAD AND PARSE DATA
 _raw_data_dir = Path(__file__).parent.parent.parent / "raw_data"
-df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now - 21}-01-01_{year_now}-04-01.json")
+_candles_per_day = {"M5": 288, "H1": 24}
+df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now - 21}-01-01_{year_now}-04-01.json", _candles_per_day[granularity])
 
 # FILTER AND SPLIT DATA
 instances = pattern_module.detect(df)
@@ -62,10 +63,10 @@ y = event_df["target"]
 def objective(trial):
     params = {
         "verbosity": 0,
-        "max_depth": trial.suggest_categorical("max_depth", [3, 4, 5, 6, 7]),
+        "max_depth": trial.suggest_categorical("max_depth", [3, 4, 5]),
         "learning_rate": trial.suggest_float("learning_rate", 0.05, 0.3),
-        "subsample": trial.suggest_float("subsample", 0.6, 0.8),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 0.8),
+        "subsample": trial.suggest_float("subsample", 0.5, 0.8),
+        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 0.8),
         "min_child_weight": trial.suggest_int("min_child_weight", 5, 30, log=True),
         "reg_alpha": trial.suggest_int("reg_alpha", 1, 30, log=True),
         "reg_lambda": trial.suggest_int("reg_lambda", 1, 30, log=True),
@@ -83,8 +84,10 @@ def objective(trial):
     for train_idxs, val_idxs in cross_val_splits(len(X), 4, 0.1):
         X_train, X_val = X.iloc[train_idxs], X.iloc[val_idxs]
         y_train, y_val = y.iloc[train_idxs], y.iloc[val_idxs]
+        pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
         model = xgb.XGBClassifier(
             **params,
+            scale_pos_weight=pos_weight,
             n_estimators=1000,
             early_stopping_rounds=50,
             random_state=42,

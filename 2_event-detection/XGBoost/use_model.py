@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data_processing import datafetcher, dataparser
 from patterns import registry
+from symmetry import apply_flip_df
 
 # LOAD CONFIGS
 with open(Path(__file__).parent.parent / "env.json", "r") as f:
@@ -32,8 +33,9 @@ except (xgb.core.XGBoostError, FileNotFoundError) as e:
     raise RuntimeError(f"Error loading model: {e}")
 
 # FETCH LIVE DATA
+_candles_per_day = {"M5": 288, "H1": 24}
 json_data, _ = datafetcher.getData(instrument, granularity, 500)
-df = dataparser.parseData(json_data)
+df = dataparser.parseData(json_data, _candles_per_day[granularity])
 
 instances = pattern_module.detect(df)
 if not instances:
@@ -43,6 +45,7 @@ else:
     row = df.iloc[[latest["index"]]].copy()
     for feat in pattern_module.METADATA_FEATURES:
         row[feat] = latest[feat]
+    apply_flip_df(row, [latest["direction"]])
 
     probabilities = model.predict_proba(row[features])[0] * 100
 

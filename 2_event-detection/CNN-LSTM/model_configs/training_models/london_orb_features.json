@@ -1,6 +1,8 @@
 {
     "features": [
         "range_atr_ratio",
+        "overshoot_ratio",
+        "body_ratio",
         "tod_sin",
         "tod_cos",
         "close_return",
