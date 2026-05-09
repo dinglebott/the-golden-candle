@@ -82,16 +82,16 @@ def cross_val_splits(n_samples, n_splits, val_ratio):
 
 
 def objective(trial):
-    seq_len = trial.suggest_categorical("seq_len", [20, 25, 30, 35])
-    conv_filters = trial.suggest_categorical("conv_filters", [16, 24, 32])
-    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7, 9])
-    lstm_hidden = trial.suggest_categorical("lstm_hidden", [16, 24, 48, 64])
+    seq_len = trial.suggest_categorical("seq_len", [72, 96, 120, 144, 192, 240, 288])
+    conv_filters = trial.suggest_categorical("conv_filters", [16, 24, 32, 48, 64])
+    conv_kernel = trial.suggest_categorical("conv_kernel_size", [3, 5, 7, 9, 11, 13])
+    lstm_hidden = trial.suggest_categorical("lstm_hidden", [16, 24, 48, 64, 96])
     lstm_layers = trial.suggest_categorical("lstm_layers", [1])
-    head_hidden = trial.suggest_categorical("head_hidden", [None, 16, 24, 32, 48]) # None for linear head
+    head_hidden = trial.suggest_categorical("head_hidden", [None, 16, 24, 32, 48, 64]) # None for linear head
     dropout = trial.suggest_float("dropout", 0.2, 0.5)
     lr = trial.suggest_float("learning_rate", 1e-5, 1e-4)
     weight_decay = trial.suggest_float("weight_decay", 1e-5, 1e-4)
-    batch_size = trial.suggest_categorical("batch_size", [48, 64, 96, 128, 196])
+    batch_size = trial.suggest_categorical("batch_size", [48, 64, 96, 128, 196, 256, 384, 512, 768, 1024])
 
     fold_scores = []
     for train_idxs, val_idxs in cross_val_splits(len(instances_tuning), 4, 0.1):
@@ -180,7 +180,7 @@ def objective(trial):
 
 
 study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=60, show_progress_bar=True)
+study.optimize(objective, n_trials=80, show_progress_bar=True)
 
 # RECORD RESULTS
 best = study.best_params
