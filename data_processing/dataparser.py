@@ -32,7 +32,7 @@ def ultSmoother(series: pd.Series, period=10):
     return result
 
 
-def parseData(jsonData):
+def parseData(jsonData, candles_per_day=24):
     if isinstance(jsonData, (str, Path)):
         with open(jsonData, "r") as file:
             rawData = json.load(file) # rawData is a Python dict
@@ -63,11 +63,18 @@ def parseData(jsonData):
     # helper
     def getEma(period):
         return df["close"].ewm(span=period, adjust=False).mean()
-    
-    # Time of day (UTC hour encoded as sin/cos pair)
-    hour = pd.to_datetime(df["time"]).dt.hour
-    df["tod_sin"] = np.sin(2 * np.pi * hour / 24)
-    df["tod_cos"] = np.cos(2 * np.pi * hour / 24)
+
+    _scale = candles_per_day / 24
+    def _w(n):  # scale a rolling window period from H1 baseline
+        return max(2, round(n * _scale))
+    def _s(n):  # scale a shift/lookback period from H1 baseline
+        return max(1, round(n * _scale))
+
+    # Time of day (minute-of-day encoded as sin/cos pair; backward-compatible with H1)
+    _dt = pd.to_datetime(df["time"])
+    _minute_of_day = _dt.dt.hour * 60 + _dt.dt.minute
+    df["tod_sin"] = np.sin(2 * np.pi * _minute_of_day / 1440)
+    df["tod_cos"] = np.cos(2 * np.pi * _minute_of_day / 1440)
 
     # Raw
     df["open_return"] = np.log(df["open"] / df["close"].shift(1))
@@ -84,11 +91,11 @@ def parseData(jsonData):
     ], axis=1).max(axis=1) # greatest of 3 values
     df["raw_atr"] = trueRange.ewm(alpha=1/14, adjust=False).mean()
     df["atr_14"] = df["raw_atr"] / df["close"]
-    df["volatility_regime"] = df["atr_14"] / df["atr_14"].rolling(50).mean()
+    df["volatility_regime"] = df["atr_14"] / df["atr_14"].rolling(_w(50)).mean()
     
     # Bollinger bands
-    bb_mid = df["close"].rolling(20).mean()
-    bb_std = df["close"].rolling(20).std()
+    bb_mid = df["close"].rolling(_w(20)).mean()
+    bb_std = df["close"].rolling(_w(20)).std()
     bb_upper = bb_mid + 2 * bb_std
     bb_lower = bb_mid - 2 * bb_std
     df["bb_width"] = (bb_upper - bb_lower) / bb_mid
@@ -125,9 +132,9 @@ def parseData(jsonData):
     df["macd_hist"] = (macd - macd_signal) / df["close"]
     
     # Volume
-    vol_sma30 = df["volume"].rolling(30).mean()
+    vol_sma30 = df["volume"].rolling(_w(30)).mean()
     df["vol_ratio"] = df["volume"] / vol_sma30
-    df["vol_momentum"] = df["vol_ratio"] - df["vol_ratio"].rolling(5).mean()
+    df["vol_momentum"] = df["vol_ratio"] - df["vol_ratio"].rolling(_w(5)).mean()
     
     # ADX, DIs
     def getAdx(df, period=14):
@@ -161,10 +168,10 @@ def parseData(jsonData):
         df[f"vol_lag{lag}"] = df["vol_return"].shift(lag)
 
     # Williams %R (rebased -50 to 50)
-    fastHighest = df["high"].rolling(21).max()
-    fastLowest = df["low"].rolling(21).min()
-    slowHighest = df["high"].rolling(112).max()
-    slowLowest = df["low"].rolling(112).min()
+    fastHighest = df["high"].rolling(_w(21)).max()
+    fastLowest = df["low"].rolling(_w(21)).min()
+    slowHighest = df["high"].rolling(_w(112)).max()
+    slowLowest = df["low"].rolling(_w(112)).min()
     fastR = (fastHighest - df["close"]) / (fastHighest - fastLowest) * -100
     slowR = (slowHighest - df["close"]) / (slowHighest - slowLowest) * -100
     df["fast_pct_R"] = fastR.ewm(span=7, adjust=False).mean() + 50
@@ -173,8 +180,8 @@ def parseData(jsonData):
     # Directional features
     eps = 1e-10
     candle_range = (df["high"] - df["low"]).clip(lower=eps)
-    prev_high_24 = df["high"].rolling(24).max().shift(1)
-    prev_low_24 = df["low"].rolling(24).min().shift(1)
+    prev_high_24 = df["high"].rolling(_w(24)).max().shift(1)
+    prev_low_24 = df["low"].rolling(_w(24)).min().shift(1)
     prev_range_24 = (prev_high_24 - prev_low_24).clip(lower=eps)
     signed_return = np.sign(df["close_return"])
 
@@ -183,17 +190,17 @@ def parseData(jsonData):
     df["close_in_bar"] = ((df["close"] - df["low"]) / candle_range) - 0.5
 
     # Multi-horizon directional momentum
-    df["cum_return_3"] = np.log(df["close"] / df["close"].shift(3))
-    df["cum_return_6"] = np.log(df["close"] / df["close"].shift(6))
-    df["cum_return_12"] = np.log(df["close"] / df["close"].shift(12))
-    df["cum_return_24"] = np.log(df["close"] / df["close"].shift(24))
+    df["cum_return_3"] = np.log(df["close"] / df["close"].shift(_s(3)))
+    df["cum_return_6"] = np.log(df["close"] / df["close"].shift(_s(6)))
+    df["cum_return_12"] = np.log(df["close"] / df["close"].shift(_s(12)))
+    df["cum_return_24"] = np.log(df["close"] / df["close"].shift(_s(24)))
     df["return_accel_3_12"] = df["cum_return_3"] - (df["cum_return_12"] / 4)
 
     # Trend slope proxies from existing moving averages
     ema15 = getEma(15)
     ema50 = getEma(50)
-    df["ema15_slope_3"] = np.log(ema15 / ema15.shift(3))
-    df["ema50_slope_5"] = np.log(ema50 / ema50.shift(5))
+    df["ema15_slope_3"] = np.log(ema15 / ema15.shift(_s(3)))
+    df["ema50_slope_5"] = np.log(ema50 / ema50.shift(_s(5)))
 
     # Breakout and range-location context
     df["breakout_dist_high_24"] = np.log(df["close"] / prev_high_24)
@@ -201,12 +208,12 @@ def parseData(jsonData):
     df["range_pos_24"] = ((df["close"] - prev_low_24) / prev_range_24) - 0.5
 
     # Directional persistence / impulse quality
-    df["momentum_consistency_8"] = signed_return.rolling(8).mean()
-    df["vol_adj_return_6"] = df["cum_return_6"] / (df["atr_14"] * np.sqrt(6) + eps)
-    df["trend_pressure_8"] = df["body_to_range"].rolling(8).mean()
+    df["momentum_consistency_8"] = signed_return.rolling(_w(8)).mean()
+    df["vol_adj_return_6"] = df["cum_return_6"] / (df["atr_14"] * np.sqrt(_s(6)) + eps)
+    df["trend_pressure_8"] = df["body_to_range"].rolling(_w(8)).mean()
     df["return_zscore_24"] = (
-        (df["close_return"] - df["close_return"].rolling(24).mean()) /
-        (df["close_return"].rolling(24).std() + eps)
+        (df["close_return"] - df["close_return"].rolling(_w(24)).mean()) /
+        (df["close_return"].rolling(_w(24)).std() + eps)
     )
 
     # drop empty rows and return

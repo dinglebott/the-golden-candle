@@ -1,0 +1,28 @@
+{
+    "features": [
+        "range_atr_ratio",
+        "tod_sin",
+        "tod_cos",
+        "close_return",
+        "body_to_range",
+        "close_in_bar",
+        "upper_wick",
+        "lower_wick",
+        "cum_return_6",
+        "cum_return_12",
+        "return_accel_3_12",
+        "vol_ratio",
+        "vol_return",
+        "atr_14",
+        "volatility_regime",
+        "bb_width",
+        "range_pos_24",
+        "breakout_dist_high_24",
+        "breakout_dist_low_24",
+        "return_zscore_24",
+        "dist_smooth14",
+        "smooth_cross",
+        "rsi_14",
+        "momentum_consistency_8"
+    ]
+}
