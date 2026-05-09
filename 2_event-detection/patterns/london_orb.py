@@ -6,7 +6,7 @@ RANGE_WINDOW = 6 # candles defining the opening range (6 × 5 min = 30 min)
 TP_MULT = 1 # take profit as a multiple of the range size
 DETECTION_WINDOW = 60 # minutes after range end to look for a breakout
 
-METADATA_FEATURES = ["range_atr_ratio", "overshoot_ratio", "body_ratio"]
+METADATA_FEATURES = ["range_atr_ratio", "overshoot_ratio"]
 
 _LONDON_TZ = ZoneInfo("Europe/London")
 _RANGE_START_MIN = 8 * 60  # 08:00 London time in minutes-since-midnight
@@ -22,7 +22,6 @@ def detect(df: pd.DataFrame) -> list[dict]:
 
     highs = df["high"].values
     lows = df["low"].values
-    opens = df["open"].values
     closes = df["close"].values
     atrs = df["raw_atr"].values
     raw_times = df["time"].values
@@ -53,11 +52,7 @@ def detect(df: pd.DataFrame) -> list[dict]:
 
         for i in post_pos:
             close = closes[i]
-            open_ = opens[i]
-            high = highs[i]
-            low = lows[i]
             atr = atrs[i]
-            candle_range = high - low
 
             if close > range_high:
                 instances.append({
@@ -72,7 +67,6 @@ def detect(df: pd.DataFrame) -> list[dict]:
                     "sl_level": float(range_low),
                     "range_atr_ratio": float(range_size / atr) if atr > 0 else 0.0,
                     "overshoot_ratio": float((close - range_high) / range_size),
-                    "body_ratio": float((close - open_) / candle_range) if candle_range > 0 else 0.0,
                 })
                 break
             elif close < range_low:
@@ -88,7 +82,6 @@ def detect(df: pd.DataFrame) -> list[dict]:
                     "sl_level": float(range_high),
                     "range_atr_ratio": float(range_size / atr) if atr > 0 else 0.0,
                     "overshoot_ratio": float((range_low - close) / range_size),
-                    "body_ratio": float((open_ - close) / candle_range) if candle_range > 0 else 0.0,
                 })
                 break
 
