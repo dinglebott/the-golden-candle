@@ -220,6 +220,10 @@ instance_pct = len(labelled) / total_candles * 100
 lines = []
 lines.append(f"=== v{version} | {instrument} {granularity} | {pattern} | CNN-LSTM | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
 lines.append(f"Pattern instances: {len(labelled)} / {total_candles} candles ({instance_pct:.1f}%)")
+if labelled and "outcome" in labelled[0]:
+    _total = len(labelled)
+    _counts = {o: sum(1 for i in labelled if i["outcome"] == o) for o in ("fill", "stopped", "expired")}
+    lines.append(f"  fill: {_counts['fill']} ({_counts['fill']/_total:.1%}) | stopped: {_counts['stopped']} ({_counts['stopped']/_total:.1%}) | expired: {_counts['expired']} ({_counts['expired']/_total:.1%})")
 lines.append(f"Train instances: {len(X_train_seq)} | Val: {len(X_val_seq)} | Test: {len(X_test_seq)}")
 lines.append(f"\nAverage precision: {avgPrecision:.4f}")
 lines.append(f"Precision (fill): {precision1:.4f}")

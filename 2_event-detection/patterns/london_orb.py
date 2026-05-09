@@ -97,6 +97,7 @@ def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int) -> 
         direction = inst["direction"]
 
         label = 0
+        outcome = "expired"
         for j in range(i + 1, min(i + 1 + n_candles, n_rows)):
             if direction == 1:
                 stopped = lows[j] <= sl
@@ -106,11 +107,13 @@ def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int) -> 
                 filled = lows[j] <= tp
 
             if stopped:
+                outcome = "stopped"
                 break
             if filled:
                 label = 1
+                outcome = "fill"
                 break
 
-        labelled.append({**inst, "label": label})
+        labelled.append({**inst, "label": label, "outcome": outcome})
 
     return labelled
