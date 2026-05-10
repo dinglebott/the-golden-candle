@@ -5,4 +5,4 @@ YEAR_NOW = 2026
 INSTRUMENT = "EUR_USD"
 GRANULARITY = "M5"
 
-datafetcher.getDataLoop(datetime(YEAR_NOW - 21, 1, 1), datetime(YEAR_NOW, 4, 1), INSTRUMENT, GRANULARITY)
+datafetcher.getDataLoop(datetime(2010, 1, 1), datetime(YEAR_NOW, 5, 1), INSTRUMENT, GRANULARITY)

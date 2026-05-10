@@ -20,7 +20,7 @@ def load_env():
 
 
 def find_data_file(instrument, granularity):
-    pattern = str(DATA_DIR / f"{instrument}_{granularity}_*.json")
+    pattern = str(DATA_DIR / f"{instrument}_{granularity}_2010-*.json")
     matches = glob.glob(pattern)
     if not matches:
         raise FileNotFoundError(f"No data file found for {instrument} {granularity} in {DATA_DIR}")
@@ -91,9 +91,9 @@ def run_triple_barrier(df, entries, n_candles):
     return trades
 
 
-def format_results(trades, instrument, granularity, strategy, n_value):
+def format_results(trades, instrument, granularity, strategy, n_value, dataset="train"):
     lines = []
-    lines.append(f"  {strategy}  |  {instrument} {granularity}")
+    lines.append(f"  {strategy}  |  {instrument} {granularity}  |  [{dataset}]")
     lines.append(f"{'='*50}")
 
     if not trades:
@@ -126,10 +126,6 @@ def format_results(trades, instrument, granularity, strategy, n_value):
     return "\n".join(lines)
 
 
-def print_results(trades, instrument, granularity, strategy):
-    print(format_results(trades, instrument, granularity, strategy))
-
-
 def main():
     env = load_env()
     instrument = env["instrument"]
@@ -142,15 +138,27 @@ def main():
         print("No strategy set in env.json")
         return
 
+    dataset = env.get("dataset", "train")
+
     data_path = find_data_file(instrument, granularity)
     df = parseData(data_path)
     df = df.reset_index(drop=True)
+
+    n = len(df)
+    train_end = int(n * 0.70)
+    val_end = int(n * 0.85)
+    if dataset == "train":
+        df = df.iloc[:train_end].reset_index(drop=True)
+    elif dataset == "val":
+        df = df.iloc[train_end:val_end].reset_index(drop=True)
+    elif dataset == "test":
+        df = df.iloc[val_end:].reset_index(drop=True)
 
     get_entries = load_strategy(strategy)
     entries = get_entries(df)
 
     trades = run_triple_barrier(df, entries, n_candles)
-    output = format_results(trades, instrument, granularity, strategy, n_candles)
+    output = format_results(trades, instrument, granularity, strategy, n_candles, dataset)
     print(output)
 
     if log_results:
