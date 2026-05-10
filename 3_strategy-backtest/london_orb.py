@@ -6,7 +6,8 @@ RANGE_WINDOW = 6    # candles forming the opening range (30 min at M5: 08:00–0
 TRADE_WINDOW = 12   # candles after the range where breakouts are valid (08:30–09:29 London)
 RANGE_MIN = 0.15    # opening range must be >= this multiple of daily ATR
 RANGE_MAX = 0.50    # opening range must be <= this multiple of daily ATR
-TP_MULT = 2.0       # take profit = entry ± range_size * TP_MULT
+TP_MULT = 2.0       # TP = entry ± range_size * TP_MULT
+SL_MULT = 0.5       # SL = near side of range ± range_size * SL_MULT (1.0 = opposite side)
 
 
 def get_entries(df):
@@ -63,13 +64,13 @@ def get_entries(df):
             if close > range_high and h_ema_trend > 0:
                 entries.at[i, "entry"] = close
                 entries.at[i, "tp"] = close + range_size * TP_MULT
-                entries.at[i, "sl"] = range_low
+                entries.at[i, "sl"] = range_high - SL_MULT * range_size
                 trade_taken = True
 
             elif close < range_low and h_ema_trend < 0:
                 entries.at[i, "entry"] = close
                 entries.at[i, "tp"] = close - range_size * TP_MULT
-                entries.at[i, "sl"] = range_high
+                entries.at[i, "sl"] = range_low + SL_MULT * range_size
                 trade_taken = True
 
     return entries

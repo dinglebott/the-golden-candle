@@ -4,6 +4,7 @@ import glob
 import importlib
 import pandas as pd
 import numpy as np
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -90,15 +91,15 @@ def run_triple_barrier(df, entries, n_candles):
     return trades
 
 
-def print_results(trades, instrument, granularity, strategy):
-    print(f"\n{'='*50}")
-    print(f"  {strategy}  |  {instrument} {granularity}")
-    print(f"{'='*50}")
+def format_results(trades, instrument, granularity, strategy, n_value):
+    lines = []
+    lines.append(f"  {strategy}  |  {instrument} {granularity}")
+    lines.append(f"{'='*50}")
 
     if not trades:
-        print("  No trades found.")
-        print(f"{'='*50}\n")
-        return
+        lines.append("  No trades found.")
+        lines.append(f"{'='*50}\n")
+        return "\n".join(lines)
 
     df = pd.DataFrame(trades)
     total = len(df)
@@ -115,12 +116,18 @@ def print_results(trades, instrument, granularity, strategy):
     avg_win_r = winning.mean() if len(winning) > 0 else 0.0
     avg_loss_r = losing.mean() if len(losing) > 0 else 0.0
 
-    print(f"  Trades:      {total}  (W: {wins}  L: {losses}  T/O: {timeouts})")
-    print(f"  Win rate:    {win_rate:.1%}")
-    print(f"  Avg win R:   +{avg_win_r:.2f}R")
-    print(f"  Avg loss R:  -{avg_loss_r:.2f}R")
-    print(f"  Expectancy:  {expectancy:+.3f}R")
-    print(f"{'='*50}\n")
+    lines.append(f"  n-value:     {n_value}")
+    lines.append(f"  Trades:      {total}  (W: {wins}  L: {losses}  T/O: {timeouts})")
+    lines.append(f"  Win rate:    {win_rate:.1%}")
+    lines.append(f"  Avg win R:   +{avg_win_r:.2f}R")
+    lines.append(f"  Avg loss R:  -{avg_loss_r:.2f}R")
+    lines.append(f"  Expectancy:  {expectancy:+.3f}R")
+    lines.append(f"{'='*50}\n")
+    return "\n".join(lines)
+
+
+def print_results(trades, instrument, granularity, strategy):
+    print(format_results(trades, instrument, granularity, strategy))
 
 
 def main():
@@ -129,6 +136,7 @@ def main():
     granularity = env["granularity"]
     strategy = env.get("strategy", "")
     n_candles = env.get("n_value", 50)
+    log_results = env.get("log_results", False)
 
     if not strategy:
         print("No strategy set in env.json")
@@ -141,18 +149,15 @@ def main():
     get_entries = load_strategy(strategy)
     entries = get_entries(df)
 
-    split = int(len(df) * 0.9)
-    sections = [
-        ("front 90%", df.iloc[:split], entries.iloc[:split]),
-        ("back 10%", df.iloc[split:], entries.iloc[split:]),
-    ]
+    trades = run_triple_barrier(df, entries, n_candles)
+    output = format_results(trades, instrument, granularity, strategy, n_candles)
+    print(output)
 
-    for label, section_df, section_entries in sections:
-        # re-index to 0-based so triple barrier positional lookups stay within section
-        section_df = section_df.reset_index(drop=True)
-        section_entries = section_entries.reset_index(drop=True)
-        trades = run_triple_barrier(section_df, section_entries, n_candles)
-        print_results(trades, instrument, granularity, f"{strategy}  [{label}]")
+    if log_results:
+        log_path = Path(__file__).parent / "backtest_results.log"
+        with open(log_path, "a") as log_file:
+            log_file.write(f"{'='*50}\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            log_file.write(output + "\n\n")
 
 
 if __name__ == "__main__":
