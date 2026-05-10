@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 RANGE_WINDOW = 6    # candles forming the opening range (30 min at M5: 08:00–08:29 London)
 TRADE_WINDOW = 12   # candles after the range where breakouts are valid (08:30–09:29 London)
-RANGE_MIN = 0.15    # opening range must be >= this multiple of daily ATR
+RANGE_MIN = 0.10    # opening range must be >= this multiple of daily ATR
 RANGE_MAX = 0.50    # opening range must be <= this multiple of daily ATR
 TP_MULT = 2.0       # TP = entry ± range_size * TP_MULT
 SL_MULT = 0.5       # SL = near side of range ± range_size * SL_MULT (1.0 = opposite side)
