@@ -134,7 +134,7 @@ def parseData(jsonData, candles_per_day=24):
         (_daily["h"] - _daily_prev_c).abs(),
         (_daily["l"] - _daily_prev_c).abs(),
     ], axis=1).max(axis=1)
-    _daily_atr = _daily_tr.ewm(alpha=1/14, adjust=False).mean()
+    _daily_atr = _daily_tr.ewm(alpha=1/14, adjust=False).mean().shift(1)
     df["daily_atr"] = _date.map(_daily_atr)
 
     # Bollinger bands
