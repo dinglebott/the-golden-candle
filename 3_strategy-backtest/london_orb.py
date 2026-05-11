@@ -3,7 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 
 RANGE_WINDOW = 6    # candles forming the opening range (30 min at M5: 08:00–08:29 London)
-TRADE_WINDOW = 12   # candles after the range where breakouts are valid (08:30–09:29 London)
+TRADE_WINDOW = 18   # candles after the range where breakouts are valid (08:30–09:59 London)
 RANGE_MIN = 0.10    # opening range must be >= this multiple of daily ATR
 RANGE_MAX = 0.60    # opening range must be <= this multiple of daily ATR
 TP_MIN_DIST = 1.0   # TP must be >= this multiple of R away (for Asian session high/low, H1 swing high/low)

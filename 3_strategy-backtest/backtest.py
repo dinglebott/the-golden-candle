@@ -145,14 +145,11 @@ def main():
     df = df.reset_index(drop=True)
 
     n = len(df)
-    train_end = int(n * 0.70)
-    val_end = int(n * 0.85)
+    train_end = int(n * 0.8)
     if dataset == "train":
         df = df.iloc[:train_end].reset_index(drop=True)
-    elif dataset == "val":
-        df = df.iloc[train_end:val_end].reset_index(drop=True)
     elif dataset == "test":
-        df = df.iloc[val_end:].reset_index(drop=True)
+        df = df.iloc[train_end:].reset_index(drop=True)
 
     get_entries = load_strategy(strategy)
     entries = get_entries(df)
@@ -165,7 +162,7 @@ def main():
         log_path = Path(__file__).parent / "backtest_results.log"
         with open(log_path, "a") as log_file:
             log_file.write(f"{'='*50}\n{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            log_file.write(output + "\n\n")
+            log_file.write(output + "\n")
 
 
 if __name__ == "__main__":
