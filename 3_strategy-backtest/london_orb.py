@@ -5,11 +5,11 @@ from tqdm import tqdm
 RANGE_WINDOW = 6    # candles forming the opening range (30 min at M5: 08:00–08:29 London)
 TRADE_WINDOW = 12   # candles after the range where breakouts are valid (08:30–09:29 London)
 RANGE_MIN = 0.10    # opening range must be >= this multiple of daily ATR
-RANGE_MAX = 0.50    # opening range must be <= this multiple of daily ATR
-TP_MIN_DIST = 2.0   # TP must be >= this multiple of R away (for Asian session high/low, H1 swing high/low)
-TP_MAX_DIST = 4.0   # TP must be <= this multiple of R away (for Asian session high/low, H1 swing high/low)
+RANGE_MAX = 0.60    # opening range must be <= this multiple of daily ATR
+TP_MIN_DIST = 1.0   # TP must be >= this multiple of R away (for Asian session high/low, H1 swing high/low)
+TP_MAX_DIST = 6.0   # TP must be <= this multiple of R away (for Asian session high/low, H1 swing high/low)
 TP_MULT = 2.0       # TP = entry ± range_size * TP_MULT (fallback)
-SL_MULT = 0.5       # SL = near side of range ± range_size * SL_MULT (1.0 = opposite side)
+SL_MULT = 1.0       # SL = near side of range ± range_size * SL_MULT (1.0 = opposite side)
 
 
 def _select_tp_bullish(entry, risk, asian_high, range_high, range_size, trade_time,
@@ -134,14 +134,14 @@ def get_entries(df):
             if abs(candle["close"] - candle["open"]) / candle_range < 0.5:
                 continue
 
-            h_ema_trend = candle["h_ema_trend"]
-            if pd.isna(h_ema_trend):
+            h_ema20 = candle["h_ema20"]
+            if pd.isna(h_ema20):
                 continue
 
             close = candle["close"]
             trade_time = dt_utc.at[i]
 
-            if close > range_high and h_ema_trend > 0:
+            if close > range_high and close > h_ema20:
                 sl = range_high - SL_MULT * range_size
                 risk = close - sl
                 tp = _select_tp_bullish(close, risk, asian_high, range_high,
@@ -152,7 +152,7 @@ def get_entries(df):
                 entries.at[i, "sl"] = sl
                 trade_taken = True
 
-            elif close < range_low and h_ema_trend < 0:
+            elif close < range_low and close < h_ema20:
                 sl = range_low + SL_MULT * range_size
                 risk = sl - close
                 tp = _select_tp_bearish(close, risk, asian_low, range_low,

@@ -157,11 +157,11 @@ def parseData(jsonData, candles_per_day=24):
     # Hourly EMA20 minus EMA50, resampled from whatever granularity is provided.
     # Shifted by one hourly bar so each candle only sees the previous completed hour (no lookahead).
     _h_close = pd.Series(df["close"].values, index=_dt).resample("1h").last().dropna()
-    _h_ema_diff = (
-        _h_close.ewm(span=20, adjust=False).mean()
-        - _h_close.ewm(span=50, adjust=False).mean()
-    ).shift(1)
+    _h_ema20 = _h_close.ewm(span=20, adjust=False).mean()
+    _h_ema50 = _h_close.ewm(span=50, adjust=False).mean()
+    _h_ema_diff = (_h_ema20 - _h_ema50).shift(1)
     df["h_ema_trend"] = _h_ema_diff.reindex(_dt, method="ffill").values / df["close"]
+    df["h_ema20"] = _h_ema20.shift(1).reindex(_dt, method="ffill").values
 
     # Smoother EMA replacements
     df["dist_smooth14"] = np.log(df["close"] / ultSmoother(df["close"], 14))
