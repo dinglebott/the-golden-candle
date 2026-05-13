@@ -7,6 +7,15 @@ Selected models are deployed to the repository website [The Golden Candle](https
 <br/>
 
 
+## RESEARCH FINDINGS
+After months of trying many different approaches, I have found that:
+- Directional prediction on a per-candle basis is near impossible. Any such attempt yields ~50% accuracy in all cases, regardless of model architecture or currency pair.
+- Volatility prediction is slightly easier, with models being able to distinguish between sideways and directional price movements most of the time.
+- Certain candlestick patterns can give a slight edge, specifically those which imply a structural level that is either respected or broken. However, most patterns are just noise for an ML model, because they end up collapsing back to the directional prediction question of "up" or "down".
+- ML approaches don't offer much performance benefit over classical algorithms in most cases, due to very high risk of overfitting. Most of the time, a hardcoded algorithm with well-defined rules and filters will be more robust in live trading, essentially acting as a manually tuned low-capacity model.
+<br/>
+
+
 ## PROJECT STRUCTURE
 ### Root
 `data_processing/` - Functions to fetch and process data, shared across all pipelines\
@@ -34,6 +43,10 @@ This experiment frames the problem as two binary classifications. Firstly, does 
 **#2 Event detection**\
 This experiment filters out specific patterns using hardcoded criteria, then predicts the probability of the expected resolution for each instance.\
 </br>
+
+**#3 Algorithmic backtesting**\
+This isn't really an experiment in itself, it's a backtesting harness to iterate and refine on trading algorithms (non-machine learning).\
+<br/>
 
 
 ## MODELS
