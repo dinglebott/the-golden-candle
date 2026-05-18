@@ -6,7 +6,7 @@ ADX_MIN = 25
 RSI_LONG_MIN = 40
 RSI_SHORT_MAX = 60
 TOLERANCE = 0.20 # zone width around pullback levels, in H1 ATR14
-SL_BUFFER = 1.0 # extra buffer below pivot low, in M15 ATR14
+SL_BUFFER = 1.5 # extra buffer below pivot low, in M15 ATR14
 TP_MIN_DIST = 1.5 # min distance from entry to TP, in multiples of risk
 TP_MAX_DIST = 6.0
 TP_FALLBACK = 2.0 # if no valid TP candidate, use this multiple of risk
@@ -52,10 +52,13 @@ def _atr(high, low, close, period=14):
     return _wilder(tr, period)
 
 
-def _select_tp_bullish(entry, risk, trade_time, sh_times, sh_vals):
+def _select_tp_bullish(entry, risk, trade_time, sh_times, sh_vals, exclude_time=None):
     # H1 swing high at bar t is confirmed at t + 2h (1-bar fractal on H1).
+    # exclude_time skips the impulse swing high so TPs aim for new territory.
     best = None
     for t, h in zip(sh_times, sh_vals):
+        if t == exclude_time:
+            continue
         if t + pd.Timedelta(hours=2) > trade_time or h <= entry:
             continue
         dist = h - entry
@@ -68,9 +71,11 @@ def _select_tp_bullish(entry, risk, trade_time, sh_times, sh_vals):
     return entry + TP_FALLBACK * risk
 
 
-def _select_tp_bearish(entry, risk, trade_time, sl_times, sl_vals):
+def _select_tp_bearish(entry, risk, trade_time, sl_times, sl_vals, exclude_time=None):
     best = None
     for t, l in zip(sl_times, sl_vals):
+        if t == exclude_time:
+            continue
         if t + pd.Timedelta(hours=2) > trade_time or l >= entry:
             continue
         dist = entry - l
@@ -244,7 +249,8 @@ def get_entries(df):
                         risk = close_i - sl
                         if risk > 0:
                             tp = _select_tp_bullish(close_i, risk, current_time,
-                                                    h1_sh_times, h1_sh_vals)
+                                                    h1_sh_times, h1_sh_vals,
+                                                    exclude_time=impulse_high_time)
                             entries.at[i, "entry"] = close_i
                             entries.at[i, "tp"] = tp
                             entries.at[i, "sl"] = sl
@@ -267,7 +273,8 @@ def get_entries(df):
                         risk = sl - close_i
                         if risk > 0:
                             tp = _select_tp_bearish(close_i, risk, current_time,
-                                                    h1_sl_times, h1_sl_vals)
+                                                    h1_sl_times, h1_sl_vals,
+                                                    exclude_time=impulse_low_time)
                             entries.at[i, "entry"] = close_i
                             entries.at[i, "tp"] = tp
                             entries.at[i, "sl"] = sl
