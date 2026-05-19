@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+TRADE_BEAR_TRENDS = False  # shorts underperform on this strategy/pair (see tuning_log.md)
+
 ADX_MIN = 25
 RSI_LONG_MIN = 40
 RSI_SHORT_MAX = 60
@@ -310,7 +312,7 @@ def get_entries(df):
         bull_trend = (adx_v >= ADX_MIN and pdi_v > mdi_v
                       and e50_v > e200_v and h4_close_v > e50_v
                       and rsi_v > RSI_LONG_MIN)
-        bear_trend = (adx_v >= ADX_MIN and mdi_v > pdi_v
+        bear_trend = (TRADE_BEAR_TRENDS and adx_v >= ADX_MIN and mdi_v > pdi_v
                       and e50_v < e200_v and h4_close_v < e50_v
                       and rsi_v < RSI_SHORT_MAX)
 
