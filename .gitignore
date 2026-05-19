@@ -3,4 +3,5 @@
 __pycache__/
 .env
 .vscode/
-raw_data/
+raw_data/EUR_USD_M5_2010-01-01_2026-05-01.json
+raw_data/EUR_USD_M15_2010-01-01_2026-05-01.json
