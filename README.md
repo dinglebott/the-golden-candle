@@ -19,7 +19,7 @@ After months of trying many different approaches, I have found that:
 ## PROJECT STRUCTURE
 ### Root
 `data_processing/` - Functions to fetch and process data, shared across all pipelines\
-`raw_data/` - Historical OHLCV data, pulled from the OANDA API\
+`raw_data/` - Historical OHLCV data, pulled from the OANDA API. Note: only H1 data is committed here, although some of the strategies use M15 or M5 data. If you want to use those, pull them yourself with `fetch_data.py`, because they are too big to commit.\
 Experiments - Each experiment has its own folder, formatted as `<experiment-no.>_<experiment-name>`. See below for a summary of the experiments. Each one has its own README.md within its folder.
 
 ### Deployment
