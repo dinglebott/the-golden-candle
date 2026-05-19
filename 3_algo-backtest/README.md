@@ -18,6 +18,7 @@ At the experiment root is an `env.json` for config - see below for details.\
 Each strategy has its own module, for example `london_orb.py`. They all expose a `get_entries()` function for the backtesting framework to slot in.\
 `backtest.py` is the standardised backtesting framework. It imports the `get_entries()` function from the specified indicator file to produce a Pandas dataframe of signals from that indicator.\
 `backtest_results.log` contains results from each strategy. They are automatically logged by `backtest.py`, provided `log_results` is set to true in `env.json`. Each new log is appended on to the end of the same file.\
+`claude_tuning_logs/` contains records of Claude agents optimising expectancy by tuning parameters and filters.
 <br/>
 
 
@@ -47,6 +48,19 @@ Searches H4 candles for a trend pullback, enters trade in the direction of the t
 **Targets**
 - TP - Search for previous H4 swing highs (excluding the impulse leg right before the pullback), else fall back to 2.0&times;R
 - SL - 1.5&times;ATR below the pullback low
+
+#### Liquidity Sweep
+Scans H4 candles for a sweep of a prior unbroken H4 swing high/low - the candle wicks beyond the swing but closes back inside. After the sweep, waits for an H1 close that breaks the most recent post-sweep H1 swing in the recovery direction (a market-structure shift). Trade is taken in the recovery direction. Symmetric for longs and shorts.\
+**Filters**
+- Sweep wick must extend >= 0.4&times;H4 ATR beyond the swept swing
+- Sweep candle close must sit in the upper/lower 75% of its range (strong rejection)
+- Swept swing must be unbroken by any intermediate H4 close, and within the last 20 H4 bars
+- Setup invalidated if H1 close returns through the sweep wick, or MSS doesn't fire within 30 H1 bars
+**Entry trigger(s)**
+- H1 close breaking the most recent post-sweep H1 swing in the recovery direction
+**Targets**
+- TP - Nearest H4 swing high/low between 1.2&times;R and 6.0&times;R from entry, else fall back to 4.0&times;R
+- SL - Sweep wick &plusmn; 0.5&times;H1 ATR
 <br/>
 
 
