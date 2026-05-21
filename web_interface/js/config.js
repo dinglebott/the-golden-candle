@@ -85,3 +85,54 @@ const PATTERN_CONFIGS = [
         }
     },
 ];
+
+// Pure-rule strategies: no probability bars; the card shows the direction badge plus
+// the entry/TP/SL the strategy fired with. Response shape (StrategyResponse):
+//   { detected, version, meta: { direction, entry, tp, sl, tp_type?, time } | null, timestamp }
+//
+// To add a new strategy:
+//   1. Drop a streamlined module into dist/api/, add to STRATEGY_REGISTRY (main.py) +
+//      STRATEGY_VERSIONS (inference.py).
+//   2. Add an entry here:
+//      - endpoint: matches /strategy/<name> on the server
+//      - renderMeta(metaEl, meta): renders direction + bar timestamp (and tp_type if present).
+const STRATEGY_CONFIGS = [
+    {
+        id: "trend_pullback",
+        label: "Trend Pullback (algo)",
+        endpoint: "/strategy/trend_pullback",
+        renderMeta(metaEl, meta) {
+            const dirColor = meta.direction === "long" ? "#4ade80" : "#f87171";
+            const dt = new Date(meta.time);
+            dt.setUTCHours(dt.getUTCHours() + 1);
+            const timeStr = dt.toLocaleString("en-SG", {
+                hour: "2-digit", minute: "2-digit", hour12: false,
+                timeZone: "Asia/Singapore"
+            });
+            metaEl.innerHTML = `
+                <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
+                <span class="pattern-time">@ ${timeStr} SGT</span>
+            `;
+        }
+    },
+    {
+        id: "liquidity_sweep",
+        label: "Liquidity Sweep (algo)",
+        endpoint: "/strategy/liquidity_sweep",
+        renderMeta(metaEl, meta) {
+            const dirColor = meta.direction === "long" ? "#4ade80" : "#f87171";
+            const dt = new Date(meta.time);
+            dt.setUTCHours(dt.getUTCHours() + 1);
+            const timeStr = dt.toLocaleString("en-SG", {
+                hour: "2-digit", minute: "2-digit", hour12: false,
+                timeZone: "Asia/Singapore"
+            });
+            const tpTag = meta.tp_type ? `<span class="pattern-gap">${meta.tp_type}</span>` : "";
+            metaEl.innerHTML = `
+                <span class="pattern-direction" style="color: ${dirColor}">${meta.direction.toUpperCase()}</span>
+                ${tpTag}
+                <span class="pattern-time">@ ${timeStr} SGT</span>
+            `;
+        }
+    },
+];

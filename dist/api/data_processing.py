@@ -19,24 +19,48 @@ apiKey = os.getenv("OANDA_KEY")
 headers = {"Authorization": f"Bearer {apiKey}"}
 baseUrl = "https://api-fxtrade.oanda.com" # access token generated from live account (don't use fxpractice)
 
-def getData(instr="EUR_USD", gran="H1", count=500):
+def getData(instr="EUR_USD", gran="H1", count=500, dailyAlignment=None, alignmentTimezone=None):
     # get response
     params = {
         "granularity": gran,
         "count": count,
         "price": "M"
     }
+    if dailyAlignment is not None:
+        params["dailyAlignment"] = dailyAlignment
+    if alignmentTimezone is not None:
+        params["alignmentTimezone"] = alignmentTimezone
     endpoint = f"/v3/instruments/{instr}/candles"
     response = requests.get(baseUrl + endpoint, headers=headers, params=params)
-    
+
     # inspect response
     if response.status_code != 200:
         raise Exception(response.text)
-    
+
     # return JSON-ified response
     data = response.json()
     timestamp = data["candles"][-1]["time"] if data["candles"][-1]["complete"] else data["candles"][-2]["time"]
     return data, timestamp
+
+
+def parseDailyOhlc(jsonData):
+    """Parses an OANDA daily-candles response into a DataFrame with OHLC columns,
+    indexed by tz-aware UTC-midnight Timestamps. Only completed candles are kept.
+    Use with `getData(..., gran="D", dailyAlignment=0, alignmentTimezone="UTC")`."""
+    records = []
+    for c in jsonData["candles"]:
+        if c["complete"]:
+            records.append({
+                "time": c["time"],
+                "open":  float(c["mid"]["o"]),
+                "high":  float(c["mid"]["h"]),
+                "low":   float(c["mid"]["l"]),
+                "close": float(c["mid"]["c"]),
+            })
+    df = pd.DataFrame(records)
+    df.index = pd.to_datetime(df["time"], utc=True).dt.floor("D")
+    df = df.drop(columns=["time"]).sort_index()
+    return df
 
 
 def ultSmoother(series: pd.Series, period=10):

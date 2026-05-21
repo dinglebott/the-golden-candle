@@ -168,6 +168,79 @@ function updatePatternCards(results) {
     PATTERN_CONFIGS.forEach((cfg, i) => updatePatternCard(cfg, results[i]));
 }
 
+// ── Strategy cards (pure-rule algos; conditional on signal) ──────────────────
+
+function buildStrategyCards() {
+    const container = document.getElementById("model-cards");
+
+    STRATEGY_CONFIGS.forEach(cfg => {
+        const card = document.createElement("div");
+        card.className = "card model-card";
+        card.id = `model-card-${cfg.id}`;
+        card.innerHTML = `
+            <div class="card-header">
+                <span class="card-title">${cfg.label}</span>
+                <span class="version-badge" id="version-${cfg.id}">--</span>
+            </div>
+            <div class="model-body">
+                <div class="prediction-badge" id="pred-${cfg.id}">--</div>
+            </div>
+            <div class="tp-sl-rows">
+                <div class="tp-sl-item">
+                    <span class="tp-sl-label">TP</span>
+                    <span class="tp-sl-value tp" id="tp-${cfg.id}">--</span>
+                </div>
+                <div class="tp-sl-item">
+                    <span class="tp-sl-label">SL</span>
+                    <span class="tp-sl-value sl" id="sl-${cfg.id}">--</span>
+                </div>
+            </div>
+            <div class="pattern-meta" id="meta-${cfg.id}" style="display: none"></div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function updateStrategyCard(cfg, data) {
+    const predEl    = document.getElementById(`pred-${cfg.id}`);
+    const versionEl = document.getElementById(`version-${cfg.id}`);
+    const metaEl    = document.getElementById(`meta-${cfg.id}`);
+    const tpEl      = document.getElementById(`tp-${cfg.id}`);
+    const slEl      = document.getElementById(`sl-${cfg.id}`);
+
+    versionEl.textContent = data.version ? `v${data.version}` : "--";
+
+    if (!data.detected) {
+        predEl.textContent       = "--";
+        predEl.style.color       = "var(--text-muted)";
+        predEl.style.borderColor = "var(--text-muted)";
+        if (tpEl) tpEl.textContent = "--";
+        if (slEl) slEl.textContent = "--";
+        metaEl.style.display = "none";
+        return;
+    }
+
+    const direction = data.meta?.direction;
+    const dirColor = direction === "long"  ? "#4ade80"
+                   : direction === "short" ? "#f87171"
+                   : "var(--text-muted)";
+    predEl.textContent       = direction ? direction.toUpperCase() : "--";
+    predEl.style.color       = dirColor;
+    predEl.style.borderColor = dirColor;
+
+    if (tpEl && data.meta?.tp != null) tpEl.textContent = formatPrice(data.meta.tp);
+    if (slEl && data.meta?.sl != null) slEl.textContent = formatPrice(data.meta.sl);
+
+    if (cfg.renderMeta && data.meta) {
+        cfg.renderMeta(metaEl, data.meta);
+        metaEl.style.display = "flex";
+    }
+}
+
+function updateStrategyCards(results) {
+    STRATEGY_CONFIGS.forEach((cfg, i) => updateStrategyCard(cfg, results[i]));
+}
+
 // ── Candle card ───────────────────────────────────────────────────────────────
 
 function updateCandle(data) {

@@ -92,5 +92,15 @@ Scans H4 candles for a sweep of a prior unbroken H4 swing high/low - the candle 
 5. Optional: `BE_TRIGGER_R` at the top of `backtest.py` moves the SL to entry once price reaches that R-multiple of favourable excursion (set to `0` to disable).
 
 ### Deploying
-
+1. Copy the strategy module into `dist/api/`, streamlined for live inference:
+    - Signature becomes `get_entries(df, ..., n_active=6) -> dict | None`. Return a single entry `{direction, entry, tp, sl, tp_type?, time}` or `None`
+    - Walk the state machine over the full df but only retain entries triggered within the last `n_active` H1 bars
+    - Skip arming/triggering on the trailing H1 bar if its H4 bucket is still incomplete
+    - Drop `tqdm` and any other backtest-only scaffolding
+    - If the strategy needs long-lookback features (e.g. daily EMA200), accept them as separate kwargs rather than resampling from a longer H1 fetch — see `trend_pullback.py` for the pattern
+2. If the strategy needs more than H1 candles, add or reuse a fetcher in `dist/api/main.py` (`_fetch_h1_only`, `_fetch_h1_plus_daily`). Fetchers return `(kwargs_for_get_entries, timestamp)`.
+3. Register the strategy in `STRATEGY_REGISTRY` (`dist/api/main.py`) with `module`, `n_active`, and `fetch`.
+4. Add an entry to `STRATEGY_VERSIONS` in `dist/api/inference.py`. Version is purely a UI badge; bump it whenever rules or constants change.
+5. Add a card config to `STRATEGY_CONFIGS` in `web_interface/js/config.js` with `id`, `label`, `endpoint`, and `renderMeta(metaEl, meta)`.
+6. Redeploy `dist/` to Railway.
 <br/>

@@ -14,6 +14,12 @@ class PatternResponse(BaseModel):
     meta: dict | None # Pattern-specific metadata (e.g. gap bounds, direction); null when not detected
     timestamp: str
 
+class StrategyResponse(BaseModel):
+    detected: bool
+    version: str
+    meta: dict | None # { direction, entry, tp, sl, tp_type?, time }; null when not detected
+    timestamp: str
+
 class CandleInfo(BaseModel):
     open: float
     high: float

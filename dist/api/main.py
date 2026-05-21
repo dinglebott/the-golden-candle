@@ -4,11 +4,13 @@ from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 
-from api.inference import loadModels, predictPatchTST, predictCnnLstm, PATTERN_VERSIONS, patchTstGateVersion
-from api.models import PredictionResponse, CandleInfo, PatternResponse
-from api.data_processing import getData, parseData, parseLiveCorrelated
+from api.inference import loadModels, predictPatchTST, predictCnnLstm, PATTERN_VERSIONS, STRATEGY_VERSIONS, patchTstGateVersion
+from api.models import PredictionResponse, CandleInfo, PatternResponse, StrategyResponse
+from api.data_processing import getData, parseData, parseLiveCorrelated, parseDailyOhlc
 import api.fair_value_gap as fvg_detector
 import api.order_block as order_block_detector
+import api.trend_pullback as trend_pullback_strategy
+import api.liquidity_sweep as liquidity_sweep_strategy
 
 logger = logging.getLogger(__name__)
 ARTIFACTS = Path("artifacts")
@@ -56,6 +58,38 @@ PATTERN_REGISTRY: dict[str, dict] = {
                   if inst["direction"] == 1
                   else inst["ob_high"] + 0.5 * inst["atr"],
         },
+    },
+}
+
+# Per-strategy fetchers. Returns (kwargs_for_get_entries, timestamp). Each strategy
+# pulls exactly the candles it needs — separating daily from H1 lets daily-EMA-based
+# strategies converge without ballooning the H1 fetch.
+def _fetch_h1_only():
+    jsonData, timestamp = getData("EUR_USD", "H1", 500)
+    return {"df": parseData(jsonData)}, timestamp
+
+def _fetch_h1_plus_daily():
+    h1_json, timestamp = getData("EUR_USD", "H1", 500)
+    daily_json, _ = getData("EUR_USD", "D", 500, dailyAlignment=0, alignmentTimezone="UTC")
+    return {"df": parseData(h1_json), "df_daily": parseDailyOhlc(daily_json)}, timestamp
+
+
+# Registry for pure-rule strategy endpoints. To add a new strategy:
+#   1. Drop a streamlined copy of the strategy module into dist/api/ that exposes
+#      get_entries(df, ..., n_active) -> dict | None.
+#   2. Add an entry here with a fetch fn that returns the kwargs that get_entries needs.
+#   3. Add the version to STRATEGY_VERSIONS in inference.py.
+#   4. Add the strategy to STRATEGY_CONFIGS in web_interface/js/config.js.
+STRATEGY_REGISTRY: dict[str, dict] = {
+    "trend_pullback": {
+        "module": trend_pullback_strategy,
+        "n_active": N_VALUE,
+        "fetch": _fetch_h1_plus_daily,
+    },
+    "liquidity_sweep": {
+        "module": liquidity_sweep_strategy,
+        "n_active": N_VALUE,
+        "fetch": _fetch_h1_only,
     },
 }
 
@@ -150,6 +184,36 @@ def getPatternPrediction(name: str):
         )
     except Exception as e:
         logger.error(f"{name} prediction failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/strategy/{name}", response_model=StrategyResponse)
+def getStrategyPrediction(name: str):
+    if name not in STRATEGY_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Strategy '{name}' not registered")
+
+    cfg = STRATEGY_REGISTRY[name]
+    version = STRATEGY_VERSIONS[name]
+
+    try:
+        inputs, timestamp = cfg["fetch"]()
+        entry = cfg["module"].get_entries(**inputs, n_active=cfg["n_active"])
+
+        if entry is None:
+            return StrategyResponse(
+                detected=False,
+                version=str(version),
+                meta=None,
+                timestamp=timestamp,
+            )
+        return StrategyResponse(
+            detected=True,
+            version=str(version),
+            meta=entry,
+            timestamp=timestamp,
+        )
+    except Exception as e:
+        logger.error(f"{name} strategy failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
