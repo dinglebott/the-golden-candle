@@ -134,7 +134,8 @@ def get_entries(df, df_daily, n_active=6):
     # H4 close marker: last H1 bar of each H4 bucket.
     # Skip the trailing bar if its H4 bucket is still incomplete (arming off
     # a partial H4 candle would use the wrong OHLC).
-    h4_close_mask = h4_floor.ne(h4_floor.shift(-1)).to_numpy()
+    # .copy() because pandas 3.0 CoW makes .to_numpy() return a read-only view.
+    h4_close_mask = h4_floor.ne(h4_floor.shift(-1)).to_numpy().copy()
     if (dt_utc.iat[-1] - h4_floor.iat[-1]) < pd.Timedelta(hours=3):
         h4_close_mask[-1] = False
 
