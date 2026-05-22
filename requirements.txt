@@ -1,4 +1,6 @@
 fastapi==0.136.1
+matplotlib==3.10.9
+mplfinance==0.12.10b0
 numpy==2.4.4
 optuna==4.8.0
 pandas==3.0.2
