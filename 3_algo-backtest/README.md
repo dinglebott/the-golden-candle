@@ -18,6 +18,7 @@ At the experiment root is an `env.json` for config - see below for details.\
 Each strategy has its own module, for example `london_orb.py`. They all expose a `get_entries()` function for the backtesting framework to slot in.\
 `backtest.py` is the standardised backtesting framework. It imports the `get_entries()` function from the specified indicator file to produce a Pandas dataframe of signals from that indicator.\
 `backtest_results.log` contains results from each strategy. They are automatically logged by `backtest.py`, provided `log_results` is set to true in `env.json`. Each new log is appended on to the end of the same file.\
+`visualise.py` generates PNGs of the trades that are produced by the strategies. Set your desired strategy and instrument in `env.json`, and set the module constants at the top of `visualise.py`. The candlestick charts of the selected trades are dumped in `trade_snapshots/` for your eyeballing.\
 `claude_tuning_logs/` contains records of Claude agents optimising expectancy by tuning parameters and filters.
 <br/>
 
