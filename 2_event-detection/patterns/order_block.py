@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from patterns._trade_sim import simulate_trade
+
 METADATA_FEATURES = ["impulse_atr_ratio", "zone_size_atr_ratio", "candles_elapsed"]
 
 SL_ATR_MULT       = 0.5  # SL beyond the OB zone as multiple of ATR
@@ -93,35 +95,34 @@ def detect(df: pd.DataFrame) -> list[dict]:
 def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int) -> list[dict]:
     highs  = df["high"].values
     lows   = df["low"].values
+    closes = df["close"].values
     atrs   = df["raw_atr"].values
-    n_rows = len(df)
 
     labelled = []
     for inst in instances:
         i   = inst["index"]
         atr = atrs[i]
+        entry = closes[i]
+        tp = inst["fill_target"]
 
-        # SL: beyond the full OB range
+        # SL: beyond the full OB range. Bullish OB is bought, bearish OB is shorted.
         if inst["direction"] == 1:
-            stop_level = inst["ob_low"] - SL_ATR_MULT * atr
+            sl = inst["ob_low"] - SL_ATR_MULT * atr
+            is_long = True
         else:
-            stop_level = inst["ob_high"] + SL_ATR_MULT * atr
+            sl = inst["ob_high"] + SL_ATR_MULT * atr
+            is_long = False
 
-        label = 0
-        for j in range(i + 1, min(i + 1 + n_candles, n_rows)):
-            if inst["direction"] == 1:
-                stopped = lows[j]  <= stop_level
-                filled  = highs[j] >= inst["fill_target"]
-            else:
-                stopped = highs[j] >= stop_level
-                filled  = lows[j]  <= inst["fill_target"]
+        outcome, r = simulate_trade(highs, lows, closes, i, n_candles, entry, tp, sl, is_long)
 
-            if stopped:
-                break
-            if filled:
-                label = 1
-                break
-
-        labelled.append({**inst, "label": label})
+        labelled.append({
+            **inst,
+            "label": 1 if outcome == "fill" else 0,
+            "outcome": outcome,
+            "r_multiple": float(r),
+            "entry": float(entry),
+            "tp": float(tp),
+            "sl": float(sl),
+        })
 
     return labelled

@@ -85,9 +85,27 @@ def get_entries(df):
     h1_floor = dt_utc.dt.floor("h")
     h1_hi = df.groupby(h1_floor)["high"].max().sort_index()
     h1_lo = df.groupby(h1_floor)["low"].min().sort_index()
+    h1_close = df.groupby(h1_floor)["close"].last().sort_index()
     h1_times  = h1_hi.index.tolist()
     h1_hi_arr = h1_hi.values
     h1_lo_arr = h1_lo.values
+
+    # H1 EMA20 — shifted by one H1 bar so each M5 candle sees only the previous completed hour.
+    h1_ema20 = h1_close.ewm(span=20, adjust=False).mean().shift(1)
+    h_ema20_arr = h1_floor.map(h1_ema20).to_numpy()
+
+    # Daily ATR — aggregate intraday candles to daily OHLC, compute ATR14 on daily bars,
+    # then map each candle to its day's value (shifted so today only sees previous day's value).
+    _date = dt_utc.dt.date
+    _daily = df.groupby(_date).agg(h=("high", "max"), l=("low", "min"), c=("close", "last"))
+    _daily_prev_c = _daily["c"].shift(1)
+    _daily_tr = pd.concat([
+        _daily["h"] - _daily["l"],
+        (_daily["h"] - _daily_prev_c).abs(),
+        (_daily["l"] - _daily_prev_c).abs(),
+    ], axis=1).max(axis=1)
+    _daily_atr_series = _daily_tr.ewm(alpha=1/14, adjust=False).mean().shift(1)
+    daily_atr_arr = _date.map(_daily_atr_series).to_numpy()
 
     swing_high_times, swing_high_vals = [], []
     swing_low_times,  swing_low_vals  = [], []
@@ -112,7 +130,7 @@ def get_entries(df):
         range_low  = df.loc[range_idx, "low"].min()
         range_size = range_high - range_low
 
-        daily_atr = df.at[range_idx[-1], "daily_atr"]
+        daily_atr = daily_atr_arr[range_idx[-1]]
         if pd.isna(daily_atr) or daily_atr == 0:
             continue
 
@@ -134,7 +152,7 @@ def get_entries(df):
             if abs(candle["close"] - candle["open"]) / candle_range < 0.5:
                 continue
 
-            h_ema20 = candle["h_ema20"]
+            h_ema20 = h_ema20_arr[i]
             if pd.isna(h_ema20):
                 continue
 

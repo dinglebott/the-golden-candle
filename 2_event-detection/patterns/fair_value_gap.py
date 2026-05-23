@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from patterns._trade_sim import simulate_trade
+
 METADATA_FEATURES = ["gap_atr_ratio"]
 
 SL_ATR_MULT = 1.5  # SL beyond the FVG candle's extreme as multiple of ATR
@@ -59,29 +61,34 @@ def detect(df: pd.DataFrame, min_gap_atr_ratio: float = 0.3) -> list[dict]:
 def label_instances(df: pd.DataFrame, instances: list[dict], n_candles: int) -> list[dict]:
     highs = df["high"].values
     lows = df["low"].values
+    closes = df["close"].values
     atrs = df["raw_atr"].values
-    n_rows = len(df)
 
     labelled = []
     for inst in instances:
         i = inst["index"]
         atr = atrs[i]
+        entry = closes[i]
+        tp = inst["fill_target"]
 
+        # A bullish FVG is faded (trader shorts), bearish FVG is bought.
         if inst["direction"] == 1:
-            stop_level = highs[i] + SL_ATR_MULT * atr
+            sl = highs[i] + SL_ATR_MULT * atr
+            is_long = False
         else:
-            stop_level = lows[i] - SL_ATR_MULT * atr
+            sl = lows[i] - SL_ATR_MULT * atr
+            is_long = True
 
-        label = 0
-        for j in range(i + 1, min(i + 1 + n_candles, n_rows)):
-            stopped = highs[j] >= stop_level if inst["direction"] == 1 else lows[j] <= stop_level
-            filled = lows[j] <= inst["fill_target"] if inst["direction"] == 1 else highs[j] >= inst["fill_target"]
-            if stopped:
-                break # same candle hit both barriers = stopped out
-            if filled:
-                label = 1
-                break
+        outcome, r = simulate_trade(highs, lows, closes, i, n_candles, entry, tp, sl, is_long)
 
-        labelled.append({**inst, "label": label})
+        labelled.append({
+            **inst,
+            "label": 1 if outcome == "fill" else 0,
+            "outcome": outcome,
+            "r_multiple": float(r),
+            "entry": float(entry),
+            "tp": float(tp),
+            "sl": float(sl),
+        })
 
     return labelled

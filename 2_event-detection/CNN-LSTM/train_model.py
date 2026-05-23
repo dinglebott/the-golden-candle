@@ -79,7 +79,7 @@ swap_indices = build_swap_indices(seq_features)
 offset_indices = build_offset_indices(seq_features)
 
 def build_sequences(df, instances, seq_len, seq_features, meta_features):
-    X_seq, X_meta, y = [], [], []
+    X_seq, X_meta, y, r_mult = [], [], [], []
     for inst in instances:
         idx = inst["index"]
         if idx < seq_len - 1:
@@ -90,11 +90,12 @@ def build_sequences(df, instances, seq_len, seq_features, meta_features):
         X_seq.append(seq)
         X_meta.append(meta)
         y.append(inst["label"])
-    return np.array(X_seq), np.array(X_meta), np.array(y, dtype=np.float32)
+        r_mult.append(inst["r_multiple"])
+    return np.array(X_seq), np.array(X_meta), np.array(y, dtype=np.float32), np.array(r_mult, dtype=np.float32)
 
-X_train_seq, X_train_meta, y_train = build_sequences(df, train_instances, seq_len, seq_features, meta_features)
-X_val_seq, X_val_meta, y_val = build_sequences(df, val_instances, seq_len, seq_features, meta_features)
-X_test_seq, X_test_meta, y_test = build_sequences(df, test_instances, seq_len, seq_features, meta_features)
+X_train_seq, X_train_meta, y_train, r_train = build_sequences(df, train_instances, seq_len, seq_features, meta_features)
+X_val_seq, X_val_meta, y_val, r_val = build_sequences(df, val_instances, seq_len, seq_features, meta_features)
+X_test_seq, X_test_meta, y_test, r_test = build_sequences(df, test_instances, seq_len, seq_features, meta_features)
 
 # NORMALISE — fit on train only
 seq_mean = X_train_seq.mean(axis=(0, 1), keepdims=True)
@@ -209,6 +210,13 @@ avgPrecision = average_precision_score(y_test_np, y_prob)
 precision1 = precision_score(y_test_np, y_pred)
 mcc = matthews_corrcoef(y_test_np, y_pred)
 train_mcc = matthews_corrcoef(y_train_np, y_pred_train)
+
+# Expectancy (R-multiple per trade, mirrors 3_algo-backtest/backtest.py): mean r_multiple
+# over instances the model would actually trade (predicted fill).
+test_pred_mask = y_pred == 1
+train_pred_mask = y_pred_train == 1
+test_exp = float(r_test[test_pred_mask].mean()) if test_pred_mask.any() else 0.0
+train_exp = float(r_train[train_pred_mask].mean()) if train_pred_mask.any() else 0.0
 cmatrix = confusion_matrix(y_test_np, y_pred)
 cmatrix_df = pd.DataFrame(cmatrix, index=["Real 0", "Real 1"], columns=["Pred 0", "Pred 1"])
 cmatrix_df["Count"] = cmatrix_df.sum(axis=1)
@@ -229,6 +237,8 @@ lines.append(f"\nAverage precision: {avgPrecision:.4f}")
 lines.append(f"Precision (fill): {precision1:.4f}")
 lines.append(f"MCC: {mcc:.4f}")
 lines.append(f"MCC (train set): {train_mcc:.4f}")
+lines.append(f"Expectancy (n={int(test_pred_mask.sum())}): {test_exp:+.3f}R")
+lines.append(f"Expectancy (train set, n={int(train_pred_mask.sum())}): {train_exp:+.3f}R")
 lines.append(f"\nConfusion matrix:\n{cmatrix_df}")
 for true_class, name in enumerate(["no_fill", "fill"]):
     mask = y_test_np == true_class

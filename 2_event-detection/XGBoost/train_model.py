@@ -1,6 +1,7 @@
 import sys
 import xgboost as xgb
 from sklearn.metrics import average_precision_score, precision_score, matthews_corrcoef, confusion_matrix
+import numpy as np
 import pandas as pd
 import json
 from pathlib import Path
@@ -68,6 +69,9 @@ X_train, y_train = df_train[best_features], df_train["target"]
 X_val, y_val = df_val[best_features], df_val["target"]
 X_test, y_test = df_test[best_features], df_test["target"]
 
+r_train = np.array([inst["r_multiple"] for inst in labelled[:train_end]], dtype=np.float32)
+r_test = np.array([inst["r_multiple"] for inst in labelled[val_end:]], dtype=np.float32)
+
 # TRAIN MODEL
 pos_weight = (y_train == 0).sum() / max((y_train == 1).sum(), 1)
 model = xgb.XGBClassifier(
@@ -91,6 +95,13 @@ avgPrecision = average_precision_score(y_test, y_prob[:, 1])
 precision1 = precision_score(y_test, y_pred)
 mcc = matthews_corrcoef(y_test, y_pred)
 train_mcc = matthews_corrcoef(y_train, y_pred_train)
+
+# Expectancy (R-multiple per trade, mirrors 3_algo-backtest/backtest.py): mean r_multiple
+# over instances the model would actually trade (predicted fill).
+test_pred_mask = y_pred == 1
+train_pred_mask = y_pred_train == 1
+test_exp = float(r_test[test_pred_mask].mean()) if test_pred_mask.any() else 0.0
+train_exp = float(r_train[train_pred_mask].mean()) if train_pred_mask.any() else 0.0
 cmatrix = confusion_matrix(y_test, y_pred)
 cmatrix_df = pd.DataFrame(cmatrix, index=["Real 0", "Real 1"], columns=["Pred 0", "Pred 1"])
 cmatrix_df["Count"] = cmatrix_df.sum(axis=1)
@@ -107,6 +118,8 @@ lines.append(f"\nAverage precision: {avgPrecision:.4f}")
 lines.append(f"Precision (fill): {precision1:.4f}")
 lines.append(f"MCC: {mcc:.4f}")
 lines.append(f"MCC (train set): {train_mcc:.4f}")
+lines.append(f"Expectancy (n={int(test_pred_mask.sum())}): {test_exp:+.3f}R")
+lines.append(f"Expectancy (train set, n={int(train_pred_mask.sum())}): {train_exp:+.3f}R")
 lines.append(f"\nConfusion matrix:\n{cmatrix_df}")
 for true_class, name in enumerate(["no_fill", "fill"]):
     mask = y_test == true_class
