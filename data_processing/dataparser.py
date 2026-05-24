@@ -216,6 +216,48 @@ def parseData(jsonData, candles_per_day=24):
         (df["close_return"].rolling(_w(24)).std() + eps)
     )
 
+    # Empirical Mode Decomposition (Ehlers)
+    # Bandpass-isolate a cycle component; smoothed peak/valley envelopes give the
+    # regime — strong separation = cyclic, collapsed envelopes = trend.
+    emd_period = 20  # fixed bar count; bandpass needs enough resolution per cycle
+    emd_delta = 0.3
+    emd_smooth_n = _w(50)
+    beta = np.cos(2 * np.pi / emd_period)
+    gamma = 1 / np.cos(4 * np.pi * emd_delta / emd_period)
+    alpha = gamma - np.sqrt(gamma ** 2 - 1)
+
+    hl2 = ((df["high"] + df["low"]) / 2).to_numpy(dtype=float)
+    bp_arr = np.zeros(len(hl2))
+    for i in range(2, len(hl2)):
+        bp_arr[i] = (
+            0.5 * (1 - alpha) * (hl2[i] - hl2[i-2])
+            + beta * (1 + alpha) * bp_arr[i-1]
+            - alpha * bp_arr[i-2]
+        )
+    df["bp"] = bp_arr
+
+    # hold most recent peak/valley forward until a new one appears
+    peak_series = np.zeros(len(bp_arr))
+    valley_series = np.zeros(len(bp_arr))
+    last_peak = 0.0
+    last_valley = 0.0
+    for i in range(2, len(bp_arr)):
+        if bp_arr[i-1] > bp_arr[i] and bp_arr[i-1] > bp_arr[i-2]:
+            last_peak = bp_arr[i-1]
+        if bp_arr[i-1] < bp_arr[i] and bp_arr[i-1] < bp_arr[i-2]:
+            last_valley = bp_arr[i-1]
+        peak_series[i] = last_peak
+        valley_series[i] = last_valley
+
+    df["avg_peak"] = pd.Series(peak_series).rolling(emd_smooth_n).mean()
+    df["avg_valley"] = pd.Series(valley_series).rolling(emd_smooth_n).mean()
+
+    # cycle mode when both envelopes are clearly separated from zero relative to ATR
+    emd_threshold = 0.5 * df["raw_atr"]
+    df["regime"] = (
+        (df["avg_peak"] > emd_threshold) & (df["avg_valley"] < -emd_threshold)
+    ).astype(int)
+
     # drop empty rows and return
     df.dropna(inplace=True)
     return df
