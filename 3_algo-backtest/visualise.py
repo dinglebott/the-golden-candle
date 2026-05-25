@@ -16,7 +16,7 @@ from data_processing.dataparser import parseData
 GRANULARITIES = ["H1", "H4", "D"]  # timeframes to render per trade
 LOOKBACK = 100                       # candles before trigger, per timeframe
 LOOKAHEAD = 50                      # candles after trigger, per timeframe
-RANGE = (0, 10)                     # (start, end) slice of valid trades to render
+RANGE = (100, 110)                     # (start, end) slice of valid trades to render
 
 ENV_PATH = Path(__file__).parent / "env.json"
 DATA_DIR = Path(__file__).resolve().parents[1] / "raw_data"
