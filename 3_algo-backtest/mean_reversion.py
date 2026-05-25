@@ -1,10 +1,13 @@
+from collections import deque
+
 import numpy as np
 import pandas as pd
 
 # === EMD cycle model (H4) ===
 EMD_PERIOD = 20             # bandpass centre, in H4 bars
 EMD_DELTA = 0.3             # bandpass bandwidth (dimensionless)
-EMD_SMOOTH_N = 50           # peak/valley smoothing window, in H4 bars
+EMD_K_EXTREMES = 2          # confirm range once this many peaks and valleys have printed
+EMD_MAX_EXTREME_AGE = 25    # drop regime if most recent peak or valley is older than this, in H4 bars
 EMD_THRESHOLD_ATR = 0.5     # avg peak/valley magnitude must exceed this * H4 ATR to count as cyclic
 
 # === TP midline (H4) ===
@@ -22,7 +25,7 @@ PIN_WICK_OPPOSING_RATIO = 1.5   # rejection wick >= this * opposing wick
 PIN_CLOSE_FRACTION = 0.5        # close in upper/lower half of bar (bull/bear pin)
 
 # === Risk ===
-SL_BUFFER_ATR = 0.5         # SL placed this many H1 ATRs beyond the pin wick
+SL_BUFFER_ATR = 1.0         # SL placed this many H1 ATRs beyond the pin wick
 
 # === Direction toggles ===
 TRADE_LONGS = True
@@ -60,22 +63,30 @@ def _emd_bandpass(price, period, delta):
 def _emd_components(high, low, atr_arr):
     hl2 = (np.asarray(high, dtype=float) + np.asarray(low, dtype=float)) / 2
     bp = _emd_bandpass(hl2, EMD_PERIOD, EMD_DELTA)
-    peak_series = np.zeros(len(bp))
-    valley_series = np.zeros(len(bp))
-    last_peak = 0.0
-    last_valley = 0.0
-    for i in range(2, len(bp)):
+    n = len(bp)
+    avg_peak = np.full(n, np.nan)
+    avg_valley = np.full(n, np.nan)
+    fresh = np.zeros(n, dtype=bool)
+    peak_buf = deque(maxlen=EMD_K_EXTREMES)
+    valley_buf = deque(maxlen=EMD_K_EXTREMES)
+    last_peak_bar = -10**9
+    last_valley_bar = -10**9
+    for i in range(2, n):
         if bp[i-1] > bp[i] and bp[i-1] > bp[i-2]:
-            last_peak = bp[i-1]
+            peak_buf.append(bp[i-1])
+            last_peak_bar = i
         if bp[i-1] < bp[i] and bp[i-1] < bp[i-2]:
-            last_valley = bp[i-1]
-        peak_series[i] = last_peak
-        valley_series[i] = last_valley
-    avg_peak = pd.Series(peak_series).rolling(EMD_SMOOTH_N).mean().to_numpy()
-    avg_valley = pd.Series(valley_series).rolling(EMD_SMOOTH_N).mean().to_numpy()
+            valley_buf.append(bp[i-1])
+            last_valley_bar = i
+        if len(peak_buf) == EMD_K_EXTREMES:
+            avg_peak[i] = sum(peak_buf) / EMD_K_EXTREMES
+        if len(valley_buf) == EMD_K_EXTREMES:
+            avg_valley[i] = sum(valley_buf) / EMD_K_EXTREMES
+        fresh[i] = ((i - last_peak_bar) <= EMD_MAX_EXTREME_AGE
+                    and (i - last_valley_bar) <= EMD_MAX_EXTREME_AGE)
     threshold = EMD_THRESHOLD_ATR * np.asarray(atr_arr, dtype=float)
     with np.errstate(invalid="ignore"):
-        cycle = (avg_peak > threshold) & (avg_valley < -threshold)
+        cycle = fresh & (avg_peak > threshold) & (avg_valley < -threshold)
     cycle = np.where(np.isnan(avg_peak) | np.isnan(avg_valley) | np.isnan(threshold), False, cycle)
     return bp, avg_peak, avg_valley, cycle.astype(bool)
 
