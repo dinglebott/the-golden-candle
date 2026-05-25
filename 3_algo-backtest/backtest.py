@@ -13,7 +13,7 @@ from data_processing.dataparser import parseData
 ENV_PATH = Path(__file__).parent / "env.json"
 DATA_DIR = Path(__file__).resolve().parents[1] / "raw_data"
 
-BE_TRIGGER_R = 0.5  # 0 = disabled. e.g. 0.5 moves SL to entry once price reaches +0.5R favorable.
+BE_TRIGGER_R = 0.0  # 0 = disabled. e.g. 0.5 moves SL to entry once price reaches +0.5R favorable.
 
 
 def load_env():
