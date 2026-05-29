@@ -66,12 +66,20 @@ candidate_features = [
     "return_accel_3_12", "ema15_slope_3", "ema50_slope_5",
     "breakout_dist_high_24", "breakout_dist_low_24", "range_pos_24",
     "momentum_consistency_8", "vol_adj_return_6", "trend_pressure_8", "return_zscore_24",
+    "bp_norm", "cycle_strength",
 ] + pattern_module.METADATA_FEATURES
 
 # LOAD AND PARSE DATA
 _raw_data_dir = Path(__file__).parent.parent.parent / "raw_data"
 _candles_per_day = {"M5": 288, "H1": 24}
-df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now - 21}-01-01_{year_now}-04-01.json", _candles_per_day[granularity])
+_data_file = max(
+    _raw_data_dir.glob(f"{instrument}_{granularity}_*.json"),
+    key=lambda p: p.stat().st_mtime,
+    default=None,
+)
+if _data_file is None:
+    raise FileNotFoundError(f"No raw data file matching {instrument}_{granularity}_*.json in {_raw_data_dir}")
+df = dataparser.parseData(_data_file, _candles_per_day[granularity])
 
 # FILTER AND SPLIT DATA
 instances = pattern_module.detect(df)

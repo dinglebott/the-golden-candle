@@ -1,0 +1,12 @@
+{
+    "features": [
+        "breakout_atr_ratio",
+        "atr_14",
+        "bp_norm",
+        "cycle_strength",
+        "tod_sin",   
+        "tod_cos",
+        "rsi_14",
+        "macd_hist"
+    ]
+}

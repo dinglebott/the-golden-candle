@@ -258,6 +258,13 @@ def parseData(jsonData, candles_per_day=24):
         (df["avg_peak"] > emd_threshold) & (df["avg_valley"] < -emd_threshold)
     ).astype(int)
 
+    # Normalised EMD features for modelling: bp position within its envelope
+    # (signed, ~[-1, 1]) and the continuous envelope separation in ATR units
+    # (the graded form of the binary regime flag above).
+    envelope = 0.5 * (df["avg_peak"] - df["avg_valley"])
+    df["bp_norm"] = df["bp"] / (envelope + eps)
+    df["cycle_strength"] = (df["avg_peak"] - df["avg_valley"]) / (df["raw_atr"] + eps)
+
     # drop empty rows and return
     df.dropna(inplace=True)
     return df

@@ -23,6 +23,7 @@ DIRECTIONAL_FEATURES = {
     "range_pos_24", "close_in_bar",
     "breakout_dist_high_24", "breakout_dist_low_24",
     "close_lag1", "close_lag2", "close_lag3", "close_lag4",
+    "bp_norm",
 }
 
 # Pairs that swap when direction == -1. If both names are also in

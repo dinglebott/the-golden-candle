@@ -43,7 +43,14 @@ seq_features = [f for f in features if f not in meta_features]
 
 # LOAD AND PARSE DATA
 _raw_data_dir = Path(__file__).parent.parent.parent / "raw_data"
-df = dataparser.parseData(_raw_data_dir / f"{instrument}_{granularity}_{year_now - 21}-01-01_{year_now}-04-01.json")
+_data_file = max(
+    _raw_data_dir.glob(f"{instrument}_{granularity}_*.json"),
+    key=lambda p: p.stat().st_mtime,
+    default=None,
+)
+if _data_file is None:
+    raise FileNotFoundError(f"No raw data file matching {instrument}_{granularity}_*.json in {_raw_data_dir}")
+df = dataparser.parseData(_data_file)
 
 # DETECT AND LABEL
 instances = pattern_module.detect(df)
