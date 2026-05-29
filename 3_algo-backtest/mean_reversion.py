@@ -1,43 +1,19 @@
 import numpy as np
 import pandas as pd
 
-# === ER regime gate (H4) ===
-ER_PERIOD = 14              # Kaufman efficiency ratio lookback, in H4 bars
-ER_THRESHOLD = 0.4          # ER strictly below this = ranging, allow trades
-
-# === Bollinger bands (H4) ===
-BB_PERIOD = 20              # SMA / stdev window, in H4 bars
-BB_STD = 2.0                # band width in standard deviations
-
-# === ATR (shared) ===
-ATR_PERIOD = 14
+# === TP midline ===
+# Ehlers' matched lowpass: SMA over 2 x the EMD bandpass period (dataparser uses
+# EMD_PERIOD=20 H1 bars) — has a transfer zero at the cycle frequency, so it
+# rejects the bp swings and leaves the trend baseline the cycle reverts to.
+MIDLINE_SMA_PERIOD = 40
 
 # === Risk ===
-SL_ATR_MULT = 1.0           # SL placed this many H4 ATRs beyond the entry candle's far extreme
+SL_ATR_MULT = 1.0           # SL placed this many ATRs beyond the entry candle's far extreme
+MIN_RR = 1.0                # skip trades whose reward:risk to the midline TP is below this
 
 # === Direction toggles ===
 TRADE_LONGS = True
 TRADE_SHORTS = True
-
-
-def _wilder(s, period):
-    return s.ewm(alpha=1/period, adjust=False).mean()
-
-
-def _atr(high, low, close, period=14):
-    tr = pd.concat([
-        high - low,
-        (high - close.shift(1)).abs(),
-        (low - close.shift(1)).abs()
-    ], axis=1).max(axis=1)
-    return _wilder(tr, period)
-
-
-def _efficiency_ratio(close, period):
-    direction = (close - close.shift(period)).abs()
-    volatility = close.diff().abs().rolling(period).sum()
-    er = direction / volatility
-    return er.replace([np.inf, -np.inf], np.nan)
 
 
 def get_entries(df):
@@ -47,90 +23,69 @@ def get_entries(df):
     sl_arr = np.full(n, np.nan)
     tp_type_arr = np.empty(n, dtype=object)
 
-    dt_utc = pd.to_datetime(df["time"], utc=True)
-    h4_floor = dt_utc.dt.floor("4h")
-    h4_floor_np = h4_floor.to_numpy()
+    # EMD components and regime are pre-computed in dataparser on this timeframe
+    bp = df["bp"].to_numpy()
+    avg_peak = df["avg_peak"].to_numpy()
+    avg_valley = df["avg_valley"].to_numpy()
+    regime = df["regime"].to_numpy()
+    atr = df["raw_atr"].to_numpy()
+    close = df["close"].to_numpy()
+    high = df["high"].to_numpy()
+    low = df["low"].to_numpy()
 
-    # === H4 reconstruction from H1 ===
-    h4 = pd.DataFrame({
-        "open":  df.groupby(h4_floor)["open"].first(),
-        "high":  df.groupby(h4_floor)["high"].max(),
-        "low":   df.groupby(h4_floor)["low"].min(),
-        "close": df.groupby(h4_floor)["close"].last(),
-    }).sort_index()
+    hl2 = (df["high"] + df["low"]) / 2
+    midline = hl2.rolling(MIDLINE_SMA_PERIOD).mean().to_numpy()
 
-    h4_atr = _atr(h4["high"], h4["low"], h4["close"], ATR_PERIOD)
-    h4_mid = h4["close"].rolling(BB_PERIOD).mean()
-    h4_std = h4["close"].rolling(BB_PERIOD).std(ddof=0)
-    h4_upper = h4_mid + BB_STD * h4_std
-    h4_lower = h4_mid - BB_STD * h4_std
-    h4_er = _efficiency_ratio(h4["close"], ER_PERIOD)
+    # Per-direction lock: blocks re-arming on the same cycle extreme until bp
+    # crosses to the opposite half (half-cycle has elapsed)
+    bull_locked = False
+    bear_locked = False
 
-    h4_close_np = h4["close"].to_numpy()
-    h4_high_np = h4["high"].to_numpy()
-    h4_low_np = h4["low"].to_numpy()
-    h4_atr_np = h4_atr.to_numpy()
-    h4_mid_np = h4_mid.to_numpy()
-    h4_upper_np = h4_upper.to_numpy()
-    h4_lower_np = h4_lower.to_numpy()
-    h4_er_np = h4_er.to_numpy()
-    h4_idx_np = h4.index.to_numpy()
-    h4_count = len(h4)
+    for i in range(1, n):
+        bp_v = bp[i]
+        bp_prev = bp[i-1]
+        if bull_locked and bp_v > 0:
+            bull_locked = False
+        if bear_locked and bp_v < 0:
+            bear_locked = False
 
-    # Map each H4 bucket to its final H1 index (the bar that closes the bucket)
-    same_as_next = h4_floor_np[:-1] == h4_floor_np[1:]
-    h4_close_idx_h1 = np.where(~same_as_next)[0]
-    h4_close_idx_h1 = np.append(h4_close_idx_h1, n - 1)
-    h4_pos_at_close = np.array([
-        np.searchsorted(h4_idx_np, h4_floor_np[i]) for i in h4_close_idx_h1
-    ])
-
-    # === Trigger: first H4 close outside a Bollinger band while ER says ranging ===
-    prev_outside_upper = False
-    prev_outside_lower = False
-    for ev_i in range(len(h4_close_idx_h1)):
-        h1_close_i = h4_close_idx_h1[ev_i]
-        h4_pos = h4_pos_at_close[ev_i]
-        if h4_pos < 0 or h4_pos >= h4_count:
+        if regime[i] != 1:
+            continue
+        c = close[i]
+        mid = midline[i]
+        atr_v = atr[i]
+        peak_v = avg_peak[i]
+        valley_v = avg_valley[i]
+        if (np.isnan(peak_v) or np.isnan(valley_v) or np.isnan(atr_v)
+                or np.isnan(mid) or atr_v <= 0):
             continue
 
-        c = h4_close_np[h4_pos]
-        hi = h4_high_np[h4_pos]
-        lo = h4_low_np[h4_pos]
-        upper = h4_upper_np[h4_pos]
-        lower = h4_lower_np[h4_pos]
-        mid = h4_mid_np[h4_pos]
-        atr_v = h4_atr_np[h4_pos]
-        er_v = h4_er_np[h4_pos]
+        # Fade exhaustion: bp at extreme on this bar and turning back toward zero
+        bull_setup = (TRADE_LONGS and not bull_locked
+                      and bp_v <= valley_v
+                      and bp_v > bp_prev)
+        bear_setup = (TRADE_SHORTS and not bear_locked
+                      and bp_v >= peak_v
+                      and bp_v < bp_prev)
 
-        outside_upper = (not np.isnan(upper)) and c > upper
-        outside_lower = (not np.isnan(lower)) and c < lower
-
-        if (np.isnan(mid) or np.isnan(atr_v) or np.isnan(er_v)
-                or atr_v <= 0):
-            prev_outside_upper = outside_upper
-            prev_outside_lower = outside_lower
+        if bull_setup and bear_setup:
             continue
-
-        ranging = er_v < ER_THRESHOLD
-
-        if ranging and TRADE_SHORTS and outside_upper and not prev_outside_upper:
-            sl = hi + SL_ATR_MULT * atr_v
-            if sl > c and mid < c:
-                entry_arr[h1_close_i] = c
-                tp_arr[h1_close_i] = mid
-                sl_arr[h1_close_i] = sl
-                tp_type_arr[h1_close_i] = "bb_midline"
-        elif ranging and TRADE_LONGS and outside_lower and not prev_outside_lower:
-            sl = lo - SL_ATR_MULT * atr_v
-            if sl < c and mid > c:
-                entry_arr[h1_close_i] = c
-                tp_arr[h1_close_i] = mid
-                sl_arr[h1_close_i] = sl
-                tp_type_arr[h1_close_i] = "bb_midline"
-
-        prev_outside_upper = outside_upper
-        prev_outside_lower = outside_lower
+        if bull_setup:
+            sl = low[i] - SL_ATR_MULT * atr_v
+            if sl < c and mid > c and (mid - c) / (c - sl) >= MIN_RR:
+                entry_arr[i] = c
+                tp_arr[i] = mid
+                sl_arr[i] = sl
+                tp_type_arr[i] = "emd_trend"
+            bull_locked = True
+        elif bear_setup:
+            sl = high[i] + SL_ATR_MULT * atr_v
+            if sl > c and mid < c and (c - mid) / (sl - c) >= MIN_RR:
+                entry_arr[i] = c
+                tp_arr[i] = mid
+                sl_arr[i] = sl
+                tp_type_arr[i] = "emd_trend"
+            bear_locked = True
 
     entries = pd.DataFrame({
         "entry": entry_arr,
