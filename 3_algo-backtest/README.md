@@ -1,11 +1,11 @@
 ## PROBLEM FRAMING
-This is a much simpler approach to forex. Instead of machine learning, I develop and implement custom strategies. Each strategy has hardcoded conditions for entry and rules for take profit/stop loss. Then, I run a backtest on the entire dataset and compute various metrics to measure performance.\
+This is a somewhat simpler approach. Instead of machine learning, I develop hardcoded conditions for entry and rules for take profit/stop loss. Then, I run a backtest on the entire dataset and compute various metrics to measure performance.\
 <br/>
 
 
 ## METHODOLOGY
 ### Backtesting
-Each indicator/metric is scored against a standardised backtesting dataset (2005-2026 data). Performance is measured by computing expectancy in terms of *R*, amount risked per trade. For example, an expectancy of 0.2*R* means that if a trader risks $100 on every trade, he can expect to win $20 per trade on average.
+Each indicator/metric is scored against a standardised backtesting dataset (2010-2026 data). Performance is measured by computing expectancy in terms of *R*, amount risked per trade. For example, an expectancy of 0.2*R* means that if a trader risks $100 on every trade, he can expect to win $20 per trade on average.
 
 ### Labelling
 The target variable is determined by triple-barrier labelling (Marcos López de Prado, 2018). Three barriers are set relative to each entry candle - stop loss, take profit, and time barrier. The time barrier is set *n* candles after the signal is given, as set in `env.json`. The SL and TP barriers are set in their respective strategy module. Labels are then computed based on which barrier is hit first.\
@@ -19,7 +19,10 @@ Each strategy has its own module, for example `london_orb.py`. They all expose a
 `backtest.py` is the standardised backtesting framework. It imports the `get_entries()` function from the specified indicator file to produce a Pandas dataframe of signals from that indicator.\
 `backtest_results.log` contains results from each strategy. They are automatically logged by `backtest.py`, provided `log_results` is set to true in `env.json`. Each new log is appended on to the end of the same file.\
 `visualise.py` generates PNGs of the trades that are produced by the strategies. Set your desired strategy and instrument in `env.json`, and set the module constants at the top of `visualise.py`. The candlestick charts of the selected trades are dumped in `trade_snapshots/` for your eyeballing.\
-`claude_tuning_logs/` contains records of Claude agents optimising expectancy by tuning parameters and filters.
+<br/>
+
+`claude_tuning_logs/` contains records of Claude agents optimising expectancy by tuning parameters and filters.\
+`TUNING_GUIDE.md` is a methodology framework for agents to reference in searching for and fine-tuning strategies.\
 <br/>
 
 

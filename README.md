@@ -57,6 +57,11 @@ This isn't really an experiment in itself, it's a backtesting harness to iterate
 
 
 ## DEPLOYMENT CHANGELOG
+### 3.1
+- Added MACD crossover strategy
+- Removed liquidity sweep and trend continuation (pending revision)
+### 3.0
+- Added non-ML strategies liquidity sweep and trend continuation
 ### 2.0
 - Implemented label smoothing and symmetrised features
 - Added FVG CNN-LSTM v3

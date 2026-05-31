@@ -6,11 +6,10 @@ from pathlib import Path
 
 from api.inference import loadModels, predictPatchTST, predictCnnLstm, PATTERN_VERSIONS, STRATEGY_VERSIONS, patchTstGateVersion
 from api.models import PredictionResponse, CandleInfo, PatternResponse, StrategyResponse
-from api.data_processing import getData, parseData, parseLiveCorrelated, parseDailyOhlc
+from api.data_processing import getData, parseData, parseLiveCorrelated
 import api.fair_value_gap as fvg_detector
 import api.order_block as order_block_detector
-import api.trend_pullback as trend_pullback_strategy
-import api.liquidity_sweep as liquidity_sweep_strategy
+import api.macd as macd_strategy
 
 logger = logging.getLogger(__name__)
 ARTIFACTS = Path("artifacts")
@@ -62,16 +61,11 @@ PATTERN_REGISTRY: dict[str, dict] = {
 }
 
 # Per-strategy fetchers. Returns (kwargs_for_get_entries, timestamp). Each strategy
-# pulls exactly the candles it needs — separating daily from H1 lets daily-EMA-based
-# strategies converge without ballooning the H1 fetch.
+# pulls exactly the candles it needs. (A daily+H1 fetcher previously existed for
+# trend_pullback; re-add one here when a strategy needs long-lookback features.)
 def _fetch_h1_only():
     jsonData, timestamp = getData("EUR_USD", "H1", 500)
     return {"df": parseData(jsonData)}, timestamp
-
-def _fetch_h1_plus_daily():
-    h1_json, timestamp = getData("EUR_USD", "H1", 500)
-    daily_json, _ = getData("EUR_USD", "D", 500, dailyAlignment=0, alignmentTimezone="UTC")
-    return {"df": parseData(h1_json), "df_daily": parseDailyOhlc(daily_json)}, timestamp
 
 
 # Registry for pure-rule strategy endpoints. To add a new strategy:
@@ -81,13 +75,8 @@ def _fetch_h1_plus_daily():
 #   3. Add the version to STRATEGY_VERSIONS in inference.py.
 #   4. Add the strategy to STRATEGY_CONFIGS in web_interface/js/config.js.
 STRATEGY_REGISTRY: dict[str, dict] = {
-    "trend_pullback": {
-        "module": trend_pullback_strategy,
-        "n_active": N_VALUE,
-        "fetch": _fetch_h1_plus_daily,
-    },
-    "liquidity_sweep": {
-        "module": liquidity_sweep_strategy,
+    "macd": {
+        "module": macd_strategy,
         "n_active": N_VALUE,
         "fetch": _fetch_h1_only,
     },
@@ -104,7 +93,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Golden Candle API",
-    version="2.0",
+    version="3.1",
     lifespan=lifespan
 )
 

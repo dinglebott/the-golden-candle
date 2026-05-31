@@ -20,8 +20,7 @@ PATTERN_VERSIONS: dict[str, int] = {
 # Pure-rule strategies (no model checkpoint). Bump when the strategy module's
 # constants or detector logic change.
 STRATEGY_VERSIONS: dict[str, int] = {
-    "trend_pullback": 1,
-    "liquidity_sweep": 1,
+    "macd": 1,
 }
 
 _patchTstGateModel = None
