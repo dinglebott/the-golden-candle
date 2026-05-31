@@ -16,7 +16,8 @@ from data_processing.dataparser import parseData
 GRANULARITIES = ["H1", "H4"]  # timeframes to render per trade
 LOOKBACK = 100                       # candles before trigger, per timeframe
 LOOKAHEAD = 50                      # candles after trigger, per timeframe
-RANGE = (100, 115)                     # (start, end) slice of valid trades to render
+COUNT = 10                           # number of random trades to render from across the span
+SEED = 64                            # RNG seed for reproducible sampling (set None for fresh draw)
 
 ENV_PATH = Path(__file__).parent / "env.json"
 DATA_DIR = Path(__file__).resolve().parents[1] / "raw_data"
@@ -164,11 +165,11 @@ def main():
     entries = get_entries(df)
 
     valid = entries.dropna(subset=["entry", "tp", "sl"])
-    start, end = RANGE
-    selected = valid.iloc[start:end]
-    if len(selected) == 0:
-        print(f"No trades in range {RANGE} (total valid: {len(valid)})")
+    if len(valid) == 0:
+        print("No valid trades to render.")
         return
+    n_sample = min(COUNT, len(valid))
+    selected = valid.sample(n=n_sample, random_state=SEED).sort_index()
 
     df_h1 = df[["open", "high", "low", "close"]].copy()
     df_h1.index = pd.to_datetime(df["time"], utc=True)
@@ -178,7 +179,7 @@ def main():
     out_dir = OUT_DIR / strategy
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Rendering {len(selected)} trades (range {RANGE}, total valid {len(valid)}) to {out_dir}")
+    print(f"Rendering {len(selected)} random trades (total valid {len(valid)}, seed {SEED}) to {out_dir}")
     for trade_idx, row in selected.iterrows():
         entry_time = pd.to_datetime(df.at[trade_idx, "time"], utc=True)
         direction = "long" if row["tp"] > row["entry"] else "short"
