@@ -27,44 +27,18 @@ Each strategy has its own module, for example `london_orb.py`. They all expose a
 
 
 ## STRATEGIES
-#### London Opening Range Breakout (ORB)
-Defines the opening range as 08:00 - 08:30 London time, accounting for daylight savings. Breakout is defined as the first candle that closes outside this range (above for bullish, below for bearish). The trade is taken in the direction of the breakout, with TP and SL defined in terms of opening range size.\
+#### MACD Cross
+Triggers when the standard MACD (12/26/9) crosses its signal line. Trades in the direction of the cross, with fixed ATR-multiple based TP and SL.\
 **Filters**
-- Breakout must be within 60min of range end (08:30 - 09:30)
-- H1 EMA-20 must be above/below H1 EMA-50 for bullish/bearish breakout respectively
-- Range size must be between 0.15&times; and 0.5&times; daily ATR
-- Breakout candle must be >50% body (no long wicks)
+- EMD regime = 0 (trending market)
+- Volume above rolling average
+- Volume ratio rising
+- Distance from EMA15 below minimum threshold
 **Entry trigger(s)**
-- Breakout candle
+- MACD crossover (histogram sign change)
 **Targets**
-- TP - 2&times;OR beyond entry price
-- SL - Midpoint of range
-
-#### Trend Pullback and Continuation
-Searches H4 candles for a trend pullback, enters trade in the direction of the trend, expecting a trend continuation. Testing revealed that downtrends perform worse, so the final implementation only scans for uptrends.\
-**Filters**
-- ADX >= 25, +DI > -DI
-- RSI remains above 40 for longs (below 60 for shorts)
-- Daily EMA50 > EMA200
-- Price > daily EMA50
-**Entry trigger(s)**
-- Break of structure on H1 candle
-**Targets**
-- TP - Search for previous H4 swing highs (excluding the impulse leg right before the pullback), else fall back to 2.0&times;R
-- SL - 1.5&times;ATR below the pullback low
-
-#### Liquidity Sweep
-Scans H4 candles for a sweep of a prior unbroken H4 swing high/low - the candle wicks beyond the swing but closes back inside. After the sweep, waits for an H1 close that breaks the most recent post-sweep H1 swing in the recovery direction (a market-structure shift). Trade is taken in the recovery direction. Symmetric for longs and shorts.\
-**Filters**
-- Sweep wick must extend >= 0.4&times;H4 ATR beyond the swept swing
-- Sweep candle close must sit in the upper/lower 75% of its range (strong rejection)
-- Swept swing must be unbroken by any intermediate H4 close, and within the last 20 H4 bars
-- Setup invalidated if H1 close returns through the sweep wick, or MSS doesn't fire within 30 H1 bars
-**Entry trigger(s)**
-- H1 close breaking the most recent post-sweep H1 swing in the recovery direction
-**Targets**
-- TP - Nearest H4 swing high/low between 1.2&times;R and 6.0&times;R from entry, else fall back to 4.0&times;R
-- SL - Sweep wick &plusmn; 0.5&times;H1 ATR
+- TP - 2&times;ATR from entry
+- SL - 1&times;ATR from entry
 <br/>
 
 
@@ -77,11 +51,11 @@ Scans H4 candles for a sweep of a prior unbroken H4 swing high/low - the candle 
     - `sl` - stop-loss price
     - `tp_type` *(optional)* - string tag for the TP source (e.g. `"asian_high"`, `"swing"`, `"fallback"`); if present, results are broken down by tag in the printout
 3. Direction is inferred from the prices - `tp > entry` is treated as a long, `tp < entry` as a short.
-4. Put strategy-specific knobs (SL/TP multiples, lookback windows, filter thresholds) as module-level constants at the top of the file. See `london_orb.py` and `trend_pullback.py` for the convention.
+4. Put strategy-specific knobs (SL/TP multiples, lookback windows, filter thresholds) as module-level constants at the top of the file.
 5. Point `env.json` at your module by setting `"strategy": "my_strategy"` (the module name, no `.py`).
 
 ### Backtesting
-1. Make sure the H1 data for your instrument exists in `../raw_data/` (run `python fetch_data.py` from the repo root if not).
+1. Make sure the data for your instrument exists in `../raw_data/` (use `fetch_data.py` if not).
 2. Edit `env.json` at the experiment root:
     - `instrument` / `granularity` - which raw data file to load (e.g. `"EUR_USD"` / `"H1"`)
     - `strategy` - module name of the strategy to run
